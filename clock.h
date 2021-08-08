@@ -36,7 +36,7 @@ typedef struct {
   unsigned int freq;
   Connected_chip* clock_bus[MAX_CHIPS_ON_BUS];
   unsigned int num_chips;
-  bool stop;
+  bool* stop;
 } Clock;
 
 void init_clock(Clock* c, unsigned int freq);

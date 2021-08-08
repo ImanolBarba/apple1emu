@@ -42,6 +42,7 @@ typedef struct {
 } PIA6821;
 
 void clock_pia(void* ptr, bool status);
-void init_input();
+void init_pia();
+void *input_run(void* ptr);
 
 #endif

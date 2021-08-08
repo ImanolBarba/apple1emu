@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <signal.h>
 
 // TODO: reset triggered by user
 // TODO: debugger
@@ -35,6 +36,7 @@
 uint16_t address_bus;
 uint8_t data_bus;
 bool reset_line;
+bool poweroff = false;
 
 M6502 cpu;
 Connected_chip cpu_callback = {
@@ -122,6 +124,8 @@ int init_apple1(size_t user_ram_size, uint8_t* rom_data, size_t rom_length, uint
   cpu.RDY = &on;
   cpu.SO = &on;
   cpu.RES = &reset_line;
+  // If the CPU stops, shut the rest of the stuff down
+  cpu.stop = &poweroff;
   ret = clock_connect(&cpu.phi2, &user_ram_callback);
   if(ret != SUCCESS) {
     return FAILURE;
@@ -144,14 +148,20 @@ int init_apple1(size_t user_ram_size, uint8_t* rom_data, size_t rom_length, uint
   if(ret != SUCCESS) {
     return FAILURE;
   }
+  main_clock.stop = &poweroff;
 
   return SUCCESS;
 }
 
 int boot_apple1(unsigned int perf_counter_freq) {
-  init_input();
+  init_pia();
   init_cpu(&cpu);
   pthread_t clock_thread;
+  pthread_t input_thread;
+  if(pthread_create(&input_thread, NULL, input_run, &poweroff)) {
+    fprintf(stderr, "Error creating thread\n");
+    return ERROR_PTHREAD_CREATE;
+  }
   if(pthread_create(&clock_thread, NULL, clock_run, &main_clock)) {
     fprintf(stderr, "Error creating thread\n");
     return ERROR_PTHREAD_CREATE;
@@ -159,19 +169,28 @@ int boot_apple1(unsigned int perf_counter_freq) {
 
   unsigned long long int perf_counter = 0;
   if(!perf_counter_freq) {
-    while(!main_clock.stop) {
+    while(!poweroff) {
       sleep(1);
     }
   } else {
-    while(!main_clock.stop) {
+    while(!poweroff) {
       // Main control loop
       sleep(perf_counter_freq);
       fprintf(stderr, "cycles per second: %.2f\n", (float)(cpu.tick_count/(perf_counter_freq*(++perf_counter))));
     }
   }
+  // Send SIGINT to the input thread so that the read syscall gets interrupted
+  if(pthread_kill(input_thread, SIGINT)) {
+    fprintf(stderr, "Error signaling input thread\n");
+    return ERROR_PTHREAD_SIGNAL;
+  }
 
   if(pthread_join(clock_thread, NULL)) {
-    fprintf(stderr, "Error joining thread\n");
+    fprintf(stderr, "Error joining clock thread\n");
+    return ERROR_PTHREAD_JOIN;
+  }
+  if(pthread_join(input_thread, NULL)) {
+    fprintf(stderr, "Error joining input thread\n");
     return ERROR_PTHREAD_JOIN;
   }
 
@@ -183,6 +202,8 @@ int boot_apple1(unsigned int perf_counter_freq) {
 }
 
 void halt_apple1() {
-  fprintf(stderr, "Halting CPU...\n");
-  main_clock.stop = true;
+  if(!poweroff) {
+    fprintf(stderr, "Halting CPU...\n");
+    poweroff = true;
+  }
 }

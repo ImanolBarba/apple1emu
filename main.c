@@ -28,8 +28,11 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <signal.h>
+#include <string.h>
 
 #define VERSION 1
+
+// TODO: Make relevant errors use perror
 
 static struct option long_options[] = {
   {"help",  no_argument,       NULL, 'h'},
@@ -73,13 +76,14 @@ size_t load_file(const char* path, uint8_t** dest) {
   }
   ssize_t num_read = 0;
   size_t data_pos = 0;
-  while((num_read = read(fd, data + data_pos, file_size)) != 0) {
+  while(num_read != file_size) {
+    num_read = read(fd, data + data_pos, file_size);
     if(num_read == -1) {
       if(errno != EINTR) {
         fprintf(stderr, "Error reading file\n");
         free(data);
         close(fd);
-        return ERROR_READING_FILE;
+        return ERROR_READ_FILE;
       }
     } else {
       data_pos += num_read;
@@ -105,11 +109,13 @@ int main(int argc, char** argv) {
   unsigned int perf_counter_frequency = DEFAULT_PERF_COUNTER_FREQ;
 
   struct sigaction act;
+  memset(&act, 0, sizeof(act));
 
   /* Set up the structure to specify the new action. */
   act.sa_handler = termination_handler;
   sigemptyset(&act.sa_mask);
-  act.sa_flags = SA_RESTART;
+  act.sa_flags &= ~SA_RESTART;
+  act.sa_flags &= ~SA_RESETHAND;
 
   if(sigaction(SIGINT, &act, NULL) == -1) {
 		fprintf(stderr, "Unable to set SIGINT handler");

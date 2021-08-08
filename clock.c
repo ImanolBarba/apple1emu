@@ -30,7 +30,6 @@ void init_clock(Clock* c, unsigned int freq) {
   c->freq = freq;
   c->num_chips = 0;
   memset(c->clock_bus, 0, MAX_CHIPS_ON_BUS * sizeof(Connected_chip*));
-  c->stop = false;
 }
 
 int clock_connect(Clock* c, Connected_chip* chip) {
@@ -43,12 +42,13 @@ int clock_connect(Clock* c, Connected_chip* chip) {
 
 void *clock_run(void* ptr) {
   Clock* c = (Clock*)ptr;
-  while(!c->stop) {
+  while(!(*c->stop)) {
     // TODO: Right now, things run at full speed. Can I find a way to limit cpu
     // usage to reproduce the original 1MHz clock speed?
     tick(c);
     tock(c);
   }
+  fprintf(stderr, "Stopping clock thread...\n");
   pthread_exit(0);
 }
 

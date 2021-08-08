@@ -38,6 +38,7 @@
 #define CLOCK_SPEED 1e6
 #define DEFAULT_PERF_COUNTER_FREQ 10
 
+
 int init_apple1(size_t user_ram_size, uint8_t* rom_data, size_t rom_length, uint8_t* extra_data, size_t extra_length);
 int boot_apple1(unsigned int perf_counter_freq);
 void halt_apple1();

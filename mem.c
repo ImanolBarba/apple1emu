@@ -50,11 +50,16 @@ bool is_enabled_mem(Mem_16* m) {
 
 void clock_mem(void* ptr, bool status) {
   Mem_16* m = (Mem_16*)ptr;
-  if(is_enabled_mem(m) && status) {
-    if(!*m->RW) {
-      m->mem[*(m->addr_bus) - m->start_addr] = *(m->data_bus);
-    } else {
-      *(m->data_bus) = m->mem[*(m->addr_bus) - m->start_addr];
+  if(status) {
+    // is_enabled_mem actually takes a relatively large amount of CPU time (at
+    // this point, as much as the run_opcode function!!), so let's only call it
+    // when the clock is actually rising
+    if(is_enabled_mem(m)) {
+      if(!*m->RW) {
+        m->mem[*(m->addr_bus) - m->start_addr] = *(m->data_bus);
+      } else {
+        *(m->data_bus) = m->mem[*(m->addr_bus) - m->start_addr];
+      }
     }
   }
 }

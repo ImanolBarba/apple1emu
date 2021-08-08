@@ -25,6 +25,8 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <errno.h>
+#include <pthread.h>
 
 struct termios orig_termios;
 
@@ -66,17 +68,17 @@ char apple_to_ascii[0x100] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
+// Linux has a 1024 buffer size for stdin (4096 if not reading from a tty), so
+// we really don't need to implement a buffer here
+char pressed_key;
+bool data_ready = false;
+
 void process_peripheral_A(PIA6821* p) {
-  // This is not a general implementation, after all, we're reading from keyb directly
-  char c;
-  if(!(p->CRA & 0x80)) {
-    if(read(STDIN_FILENO, &c, 1) == 1) {
-      // TODO: Parse escape sequence in case it's a function key or something
-      char translated_char = ascii_to_apple[c];
-      if(translated_char != 0x00) {
-        p->PA = (uint8_t)translated_char;
-        p->CRA |= 0x80;
-      }
+  if(data_ready && !(p->CRA & 0x80)) {
+    char translated_char = ascii_to_apple[pressed_key];
+    if(translated_char != 0x00) {
+      p->PA = (uint8_t)translated_char;
+      p->CRA |= 0x80;
     }
   }
 }
@@ -128,18 +130,29 @@ void clock_pia(void* ptr, bool status) {
   }
 }
 
+void *input_run(void* ptr) {
+  bool* stop = (bool*)ptr;
+  while(!(*stop)) {
+    if(read(STDIN_FILENO, &pressed_key, 1) != 1) {
+      if(errno == EINTR) {
+        continue;
+      }
+      fprintf(stderr, "Error reading from stdin\n");
+    }
+  }
+  fprintf(stderr, "Stopping input thread...\n");
+  pthread_exit(0);
+}
+
 void restore_term() {
   tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
 }
 
-void init_input() {
+void init_pia() {
   // Set RAW mode
   tcgetattr(STDIN_FILENO, &orig_termios);
   atexit(restore_term);
   struct termios raw = orig_termios;
   raw.c_lflag &= ~(ECHO | ICANON);
   tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
-
-  // Set nonblocking IO
-  fcntl(0, F_SETFL, fcntl(0, F_GETFL) | O_NONBLOCK);
 }

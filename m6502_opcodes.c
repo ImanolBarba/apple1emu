@@ -29,7 +29,9 @@ typedef void (*opcode_func)(M6502*);
 
 // UNDEF
 void op_XX(M6502* cpu) {
-  //fprintf(stderr, "Unknown opcode: 0x%02X\n", cpu->IR >> 3);
+  // TODO: Uncomment this
+  // fprintf(stderr, "Unknown opcode: 0x%02X\n", cpu->IR >> 3);
+  // cpu_crash(cpu);
   fetch(cpu);
 }
 

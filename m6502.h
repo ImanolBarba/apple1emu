@@ -29,7 +29,7 @@
 
 #define STACK_BASE_ADDR 0x01FF
 #define STACK_TOP_ADDR 0x0100
-#define MEMSIZE 0xFFFF
+#define MEMSIZE 0x10000
 
 #define BRK_IRQ 0x01
 #define BRK_NMI 0x02
@@ -51,6 +51,9 @@
 typedef struct {
   // Just profiling
   unsigned long long int tick_count;
+
+  // To signal that the CPU has stopped
+  bool* stop;
 
   // Internal registers - for internal use only
   // IR not only tracks the current opcode, but at what stage of the opcode we
@@ -93,9 +96,27 @@ typedef struct {
   Clock phi2;
 } M6502;
 
+struct M6502_Registers {
+  int8_t A;
+  int8_t X;
+  int8_t Y;
+  uint16_t PC;
+  uint8_t S;
+  uint8_t status;
+  uint8_t RW;
+  uint8_t SYNC;
+  uint16_t addr_bus;
+  uint8_t data_bus;
+} __attribute__((packed));
+
+typedef struct M6502_Registers M6502_Registers;
+
 void clock_cpu(void* ptr, bool status);
 void init_cpu(M6502* cpu);
 void cpu_cycle(M6502* cpu);
+void cpu_crash(M6502* cpu);
+int save_state(M6502* cpu);
+int load_state(M6502* cpu);
 
 // Indexing stuff
 void get_arg_indirect_index(M6502* cpu);
