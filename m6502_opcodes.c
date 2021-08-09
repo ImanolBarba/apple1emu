@@ -23,15 +23,12 @@
 
 #include <stdio.h>
 
-// TODO: Opcodes
-
 typedef void (*opcode_func)(M6502*);
 
 // UNDEF
 void op_XX(M6502* cpu) {
-  // TODO: Uncomment this
-  // fprintf(stderr, "Unknown opcode: 0x%02X\n", cpu->IR >> 3);
-  // cpu_crash(cpu);
+  fprintf(stderr, "Unknown opcode: 0x%02X\n", cpu->IR >> 3);
+  cpu_crash(cpu);
   fetch(cpu);
 }
 
@@ -350,10 +347,7 @@ void op_24(M6502* cpu) {
     get_arg_zero_page(cpu);
     return;
   }
-  if(cpu->A & *cpu->data_bus) {
-    cpu->status |= STATUS_ZF;
-  }
-  cpu->status = (cpu->status & 0x3F) | (*cpu->data_bus & 0xC0);
+  do_BIT(cpu);
   fetch(cpu);
 }
 
@@ -439,10 +433,7 @@ if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute(cpu);
     return;
   }
-  if(cpu->A & *cpu->data_bus) {
-    cpu->status |= STATUS_ZF;
-  }
-  cpu->status = (cpu->status & 0x3F) | (*cpu->data_bus & 0xC0);
+  do_BIT(cpu);
   fetch(cpu);
 }
 
@@ -492,7 +483,460 @@ void op_31(M6502* cpu) {
   fetch(cpu);
 }
 
+// AND zpg, X
+void op_35(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_zero_page_index(cpu, cpu->X);
+    return;
+  }
+  do_AND(cpu);
+  fetch(cpu);
+}
 
+// ROL zpg, X
+void op_36(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_zero_page_index(cpu, cpu->X);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 3:
+      cpu->AD = *cpu->data_bus;
+      cpu->RW = false;
+    break;
+    case 4:
+      *cpu->data_bus = do_ROL(cpu, cpu->AD);
+      cpu->RW = false;
+    break;
+    case 5:
+      fetch(cpu);
+    break;
+  }
+}
+
+// SEC
+void op_38(M6502* cpu) {
+ switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      cpu->status |= STATUS_CF;
+      fetch(cpu);
+    break;
+  }
+}
+
+// AND abs, Y
+void op_39(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 4) {
+    get_arg_absolute_index(cpu, cpu->Y);
+    return;
+  }
+  do_AND(cpu);
+  fetch(cpu);
+}
+
+// AND abs, X
+void op_3D(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 4) {
+    get_arg_absolute_index(cpu, cpu->X);
+    return;
+  }
+  do_AND(cpu);
+  fetch(cpu);
+}
+
+// ROL abs, X
+void op_3E(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 4) {
+    get_arg_absolute_index(cpu, cpu->X);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 4:
+      cpu->AD = *cpu->data_bus;
+      cpu->RW = false;
+    break;
+    case 5:
+      *cpu->data_bus = do_ROL(cpu, cpu->AD);
+      cpu->RW = false;
+    break;
+    case 6:
+      fetch(cpu);
+    break;
+  }
+}
+
+// RTI
+void op_40(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      *cpu->addr_bus = STACK_TOP_ADDR | cpu->S++;
+    break;
+    case 2:
+      *cpu->addr_bus = STACK_TOP_ADDR | cpu->S++;
+    break;
+    case 3:
+      *cpu->addr_bus = STACK_TOP_ADDR | cpu->S++;
+      cpu->status = (*cpu->data_bus | STATUS_BF) & ~STATUS_BF;
+    break;
+    case 4:
+      *cpu->addr_bus = STACK_TOP_ADDR | cpu->S;
+      *cpu->PCL = *cpu->data_bus;
+    break;
+    case 5:
+      *cpu->PCH = *cpu->data_bus;
+      fetch(cpu);
+    break;
+  }
+}
+
+// EOR X, ind
+void op_41(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 5) {
+    get_arg_index_indirect(cpu);
+    return;
+  }
+  do_EOR(cpu);
+  fetch(cpu);
+}
+
+// EOR zpg
+void op_45(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 2) {
+    get_arg_zero_page(cpu);
+    return;
+  }
+  do_EOR(cpu);
+  fetch(cpu);
+}
+
+// LSR zpg
+void op_46(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 2) {
+    get_arg_zero_page(cpu);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 2:
+      cpu->AD = *cpu->data_bus;
+      cpu->RW = false;
+    break;
+    case 3:
+      *cpu->data_bus = do_LSR(cpu, cpu->AD);
+      cpu->RW = false;
+    break;
+    case 4:
+      fetch(cpu);
+    break;
+  }
+}
+
+// PHA
+void op_48(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      push_stack(cpu, cpu->A);
+    break;
+    case 2:
+      fetch(cpu);
+    break;
+  }
+}
+
+// EOR #
+void op_49(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC++;
+    break;
+    case 1:
+      do_EOR(cpu);
+      fetch(cpu);
+    break;
+  }
+}
+
+// LSR A
+void op_4A(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      cpu->A = do_LSR(cpu, cpu->A);
+      fetch(cpu);
+    break;
+  }
+}
+
+// JMP abs
+void op_4C(M6502* cpu) {
+switch(cpu->IR & 0x3) {
+    case 0:
+      *cpu->addr_bus = cpu->PC++;
+    break;
+    case 1:
+      *cpu->addr_bus = cpu->PC++;
+      cpu->AD = *cpu->data_bus;
+    break;
+    case 2:
+      cpu->PC = *cpu->data_bus << 8 | cpu->AD;
+      fetch(cpu);
+    break;
+  }
+}
+
+// EOR Abs
+void op_4D(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_absolute(cpu);
+    return;
+  }
+  do_EOR(cpu);
+  fetch(cpu);
+}
+
+// LSR Abs
+void op_4E(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_absolute(cpu);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 3:
+      cpu->AD = *cpu->data_bus;
+      cpu->RW = false;
+    break;
+    case 4:
+      *cpu->data_bus = do_LSR(cpu, cpu->AD);
+      cpu->RW = false;
+    break;
+    case 5:
+      fetch(cpu);
+    break;
+  }
+}
+
+// BVC
+void op_50(M6502* cpu) {
+  branch(cpu, !(cpu->status & STATUS_VF));
+}
+
+// EOR ind, Y
+void op_51(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 5) {
+    get_arg_indirect_index(cpu);
+    return;
+  }
+  do_EOR(cpu);
+  fetch(cpu);
+}
+
+// EOR zpg, X
+void op_55(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_zero_page_index(cpu, cpu->X);
+    return;
+  }
+  do_EOR(cpu);
+  fetch(cpu);
+}
+
+// LSR zpg, X
+void op_56(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_zero_page_index(cpu, cpu->X);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 3:
+      cpu->AD = *cpu->data_bus;
+      cpu->RW = false;
+    break;
+    case 4:
+      *cpu->data_bus = do_LSR(cpu, cpu->AD);
+      cpu->RW = false;
+    break;
+    case 5:
+      fetch(cpu);
+    break;
+  }
+}
+
+// CLI
+void op_58(M6502* cpu) {
+ switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      cpu->status &= ~STATUS_IF;
+      fetch(cpu);
+    break;
+  }
+}
+
+// EOR abs, Y
+void op_59(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 4) {
+    get_arg_absolute_index(cpu, cpu->Y);
+    return;
+  }
+  do_EOR(cpu);
+  fetch(cpu);
+}
+
+// EOR abs, X
+void op_5D(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 4) {
+    get_arg_absolute_index(cpu, cpu->X);
+    return;
+  }
+  do_EOR(cpu);
+  fetch(cpu);
+}
+
+// LSR abs, X
+void op_5E(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 4) {
+    get_arg_absolute_index(cpu, cpu->X);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 4:
+      cpu->AD = *cpu->data_bus;
+      cpu->RW = false;
+    break;
+    case 5:
+      *cpu->data_bus = do_LSR(cpu, cpu->AD);
+      cpu->RW = false;
+    break;
+    case 6:
+      fetch(cpu);
+    break;
+  }
+}
+
+// RTS
+void op_60(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      *cpu->addr_bus = STACK_TOP_ADDR | cpu->S++;
+    break;
+    case 2:
+      *cpu->addr_bus = STACK_TOP_ADDR | cpu->S++;
+    break;
+    case 3:
+      cpu->AD = *cpu->data_bus;
+      *cpu->addr_bus = STACK_TOP_ADDR | cpu->S;
+    break;
+    case 4:
+      cpu->PC = cpu->AD | ((*cpu->data_bus) << 8);
+      *cpu->addr_bus = cpu->PC++;
+    break;
+    case 5:
+      fetch(cpu);
+    break;
+  }
+}
+
+// ADC X, ind
+void op_61(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 5) {
+    get_arg_index_indirect(cpu);
+    return;
+  }
+  do_ADC(cpu);
+  fetch(cpu);
+}
+
+// ADC zpg
+void op_65(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 2) {
+    get_arg_zero_page(cpu);
+    return;
+  }
+  do_ADC(cpu);
+  fetch(cpu);
+}
+
+// ROR zpg
+void op_66(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 2) {
+    get_arg_zero_page(cpu);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 2:
+      cpu->AD = *cpu->data_bus;
+      cpu->RW = false;
+    break;
+    case 3:
+      *cpu->data_bus = do_ROR(cpu, cpu->AD);
+      cpu->RW = false;
+    break;
+    case 4:
+      fetch(cpu);
+    break;
+  }
+}
+
+// PLA
+void op_68(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      *cpu->addr_bus = STACK_TOP_ADDR | cpu->S++;
+    break;
+    case 2:
+      *cpu->addr_bus = STACK_TOP_ADDR | cpu->S;
+    break;
+    case 3:
+      cpu->A = *cpu->data_bus;
+      update_flags_register(cpu, cpu->A);
+      fetch(cpu);
+    break;
+  }
+}
+
+// ADC #
+void op_69(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC++;
+    break;
+    case 1:
+      do_ADC(cpu);
+      fetch(cpu);
+    break;
+  }
+}
+
+// ROR A
+void op_6A(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      cpu->A = do_ROR(cpu, cpu->A);
+      fetch(cpu);
+    break;
+  }
+}
 
 // JMP ind
 void op_6C(M6502* cpu) {
@@ -519,23 +963,1204 @@ void op_6C(M6502* cpu) {
   }
 }
 
+// ADC Abs
+void op_6D(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_absolute(cpu);
+    return;
+  }
+  do_ADC(cpu);
+  fetch(cpu);
+}
+
+// ROR Abs
+void op_6E(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_absolute(cpu);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 3:
+      cpu->AD = *cpu->data_bus;
+      cpu->RW = false;
+    break;
+    case 4:
+      *cpu->data_bus = do_ROR(cpu, cpu->AD);
+      cpu->RW = false;
+    break;
+    case 5:
+      fetch(cpu);
+    break;
+  }
+}
+
+// BVS
+void op_70(M6502* cpu) {
+  branch(cpu, cpu->status & STATUS_VF);
+}
+
+// ADC ind, Y
+void op_71(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 5) {
+    get_arg_indirect_index(cpu);
+    return;
+  }
+  do_ADC(cpu);
+  fetch(cpu);
+}
+
+// ADC zpg, X
+void op_75(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_zero_page_index(cpu, cpu->X);
+    return;
+  }
+  do_ADC(cpu);
+  fetch(cpu);
+}
+
+// ROR zpg, X
+void op_76(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_zero_page_index(cpu, cpu->X);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 3:
+      cpu->AD = *cpu->data_bus;
+      cpu->RW = false;
+    break;
+    case 4:
+      *cpu->data_bus = do_ROR(cpu, cpu->AD);
+      cpu->RW = false;
+    break;
+    case 5:
+      fetch(cpu);
+    break;
+  }
+}
+
+// SEI
+void op_78(M6502* cpu) {
+ switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      cpu->status |= STATUS_IF;
+      fetch(cpu);
+    break;
+  }
+}
+
+// ADC abs, Y
+void op_79(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 4) {
+    get_arg_absolute_index(cpu, cpu->Y);
+    return;
+  }
+  do_ADC(cpu);
+  fetch(cpu);
+}
+
+// ADC abs, X
+void op_7D(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 4) {
+    get_arg_absolute_index(cpu, cpu->X);
+    return;
+  }
+  do_ADC(cpu);
+  fetch(cpu);
+}
+
+// ROR abs, X
+void op_7E(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 4) {
+    get_arg_absolute_index(cpu, cpu->X);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 4:
+      cpu->AD = *cpu->data_bus;
+      cpu->RW = false;
+    break;
+    case 5:
+      *cpu->data_bus = do_ROR(cpu, cpu->AD);
+      cpu->RW = false;
+    break;
+    case 6:
+      fetch(cpu);
+    break;
+  }
+}
+
+// STA X, ind
+void op_81(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 4) {
+    get_arg_index_indirect(cpu);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 4:
+      // We just want to use the last cycle to also set the accumulator
+      get_arg_index_indirect(cpu);
+      *cpu->data_bus = cpu->A;
+      cpu->RW = false;
+    break;
+    case 5:
+      fetch(cpu);
+    break;
+  }
+}
+
+// STY zpg
+void op_84(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 1) {
+    get_arg_zero_page(cpu);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 1:
+      get_arg_zero_page(cpu);
+      *cpu->data_bus = cpu->Y;
+      cpu->RW = false;
+    break;
+    case 2:
+      fetch(cpu);
+    break;
+  }
+}
+
+// STA zpg
+void op_85(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 1) {
+    get_arg_zero_page(cpu);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 1:
+      get_arg_zero_page(cpu);
+      *cpu->data_bus = cpu->A;
+      cpu->RW = false;
+    break;
+    case 2:
+      fetch(cpu);
+    break;
+  }
+}
+
+// STX zpg
+void op_86(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 1) {
+    get_arg_zero_page(cpu);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 1:
+      get_arg_zero_page(cpu);
+      *cpu->data_bus = cpu->X;
+      cpu->RW = false;
+    break;
+    case 2:
+      fetch(cpu);
+    break;
+  }
+}
+
+// DEY
+void op_88(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      cpu->Y--;
+      update_flags_register(cpu, cpu->Y);
+      fetch(cpu);
+    break;
+  }
+}
+
+// TXA
+void op_8A(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      cpu->A = cpu->X;
+      update_flags_register(cpu, cpu->A);
+      fetch(cpu);
+    break;
+  }
+}
+
+// STY abs
+void op_8C(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 2) {
+    get_arg_absolute(cpu);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 2:
+      get_arg_absolute(cpu);
+      *cpu->data_bus = cpu->Y;
+      cpu->RW = false;
+    break;
+    case 3:
+      fetch(cpu);
+    break;
+  }
+}
+
+// STA abs
+void op_8D(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 2) {
+    get_arg_absolute(cpu);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 2:
+      get_arg_absolute(cpu);
+      *cpu->data_bus = cpu->A;
+      cpu->RW = false;
+    break;
+    case 3:
+      fetch(cpu);
+    break;
+  }
+}
+
+// STX abs
+void op_8E(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 2) {
+    get_arg_absolute(cpu);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 2:
+      get_arg_absolute(cpu);
+      *cpu->data_bus = cpu->Y;
+      cpu->RW = false;
+    break;
+    case 3:
+      fetch(cpu);
+    break;
+  }
+}
+
+// BCC
+void op_90(M6502* cpu) {
+  branch(cpu, !(cpu->status & STATUS_CF));
+}
+
+// STA ind, Y
+void op_91(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 4) {
+    get_arg_indirect_index(cpu);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 4:
+      get_arg_indirect_index(cpu);
+      *cpu->data_bus = cpu->A;
+      cpu->RW = false;
+    break;
+    case 5:
+      fetch(cpu);
+    break;
+  }
+}
+
+// STY zpg, X
+void op_94(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 2) {
+    get_arg_zero_page_index(cpu, cpu->X);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 2:
+      get_arg_zero_page_index(cpu, cpu->X);
+      *cpu->data_bus = cpu->Y;
+      cpu->RW = false;
+    break;
+    case 3:
+      fetch(cpu);
+    break;
+  }
+}
+
+// STA zpg, X
+void op_95(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 2) {
+    get_arg_zero_page_index(cpu, cpu->X);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 2:
+      get_arg_zero_page_index(cpu, cpu->X);
+      *cpu->data_bus = cpu->A;
+      cpu->RW = false;
+    break;
+    case 3:
+      fetch(cpu);
+    break;
+  }
+}
+
+// STX zpg, Y
+void op_96(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 2) {
+    get_arg_zero_page_index(cpu, cpu->Y);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 2:
+      get_arg_zero_page_index(cpu, cpu->X);
+      *cpu->data_bus = cpu->X;
+      cpu->RW = false;
+    break;
+    case 3:
+      fetch(cpu);
+    break;
+  }
+}
+
+// TYA
+void op_98(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      cpu->A = cpu->Y;
+      update_flags_register(cpu, cpu->A);
+      fetch(cpu);
+    break;
+  }
+}
+
+// STA abs, Y
+void op_99(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_absolute_index(cpu, cpu->Y);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 3:
+      get_arg_absolute_index(cpu, cpu->Y);
+      *cpu->data_bus = cpu->A;
+      cpu->RW = false;
+    break;
+    case 4:
+      fetch(cpu);
+    break;
+  }
+}
+
+// TXS
+void op_9A(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      cpu->S = cpu->X;
+      fetch(cpu);
+    break;
+  }
+}
+
+// STA abs, X
+void op_9D(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_absolute_index(cpu, cpu->X);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 3:
+      get_arg_absolute_index(cpu, cpu->X);
+      *cpu->data_bus = cpu->A;
+      cpu->RW = false;
+    break;
+    case 4:
+      fetch(cpu);
+    break;
+  }
+}
+
+// LDY imm
+void op_A0(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC++;
+    break;
+    case 1:
+      do_LD_(cpu, &cpu->Y);
+      fetch(cpu);
+    break;
+  }
+}
+
+// LDA X, ind
+void op_A1(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 5) {
+    get_arg_index_indirect(cpu);
+    return;
+  }
+  do_LD_(cpu, &cpu->A);
+  fetch(cpu);
+}
+
+// LDX imm
+void op_A2(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC++;
+    break;
+    case 1:
+      do_LD_(cpu, &cpu->X);
+      fetch(cpu);
+    break;
+  }
+}
+
+// LDY zpg
+void op_A4(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 2) {
+    get_arg_zero_page(cpu);
+    return;
+  }
+  do_LD_(cpu, &cpu->Y);
+  fetch(cpu);
+}
+
+// LDA zpg
+void op_A5(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 2) {
+    get_arg_zero_page(cpu);
+    return;
+  }
+  do_LD_(cpu, &cpu->A);
+  fetch(cpu);
+}
+
+// LDX zpg
+void op_A6(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 2) {
+    get_arg_zero_page(cpu);
+    return;
+  }
+  do_LD_(cpu, &cpu->X);
+  fetch(cpu);
+}
+
+// TAY
+void op_A8(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      cpu->Y = cpu->A;
+      update_flags_register(cpu, cpu->Y);
+      fetch(cpu);
+    break;
+  }
+}
+
+// LDA imm
+void op_A9(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC++;
+    break;
+    case 1:
+      do_LD_(cpu, &cpu->A);
+      fetch(cpu);
+    break;
+  }
+}
+
+// TAX
+void op_AA(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      cpu->X = cpu->A;
+      update_flags_register(cpu, cpu->X);
+      fetch(cpu);
+    break;
+  }
+}
+
+// LDY abs
+void op_AC(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_absolute(cpu);
+    return;
+  }
+  do_LD_(cpu, &cpu->Y);
+  fetch(cpu);
+}
+
+// LDA abs
+void op_AD(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_absolute(cpu);
+    return;
+  }
+  do_LD_(cpu, &cpu->A);
+  fetch(cpu);
+}
+
+// LDX abs
+void op_AE(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_absolute(cpu);
+    return;
+  }
+  do_LD_(cpu, &cpu->X);
+  fetch(cpu);
+}
+
+// BCS
+void op_B0(M6502* cpu) {
+  branch(cpu, cpu->status & STATUS_CF);
+}
+
+// LDA ind, Y
+void op_B1(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 5) {
+    get_arg_indirect_index(cpu);
+    return;
+  }
+  do_LD_(cpu, &cpu->A);
+  fetch(cpu);
+}
+
+// LDY zpg, X
+void op_B4(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_zero_page_index(cpu, cpu->X);
+    return;
+  }
+  do_LD_(cpu, &cpu->Y);
+  fetch(cpu);
+}
+
+// LDA zpg, X
+void op_B5(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_zero_page_index(cpu, cpu->X);
+    return;
+  }
+  do_LD_(cpu, &cpu->A);
+  fetch(cpu);
+}
+
+// LDX zpg, Y
+void op_B6(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_zero_page_index(cpu, cpu->Y);
+    return;
+  }
+  do_LD_(cpu, &cpu->X);
+  fetch(cpu);
+}
+
+// CLV
+void op_B8(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      cpu->status &= ~STATUS_VF;
+      fetch(cpu);
+    break;
+  }
+}
+
+// LDA abs, Y
+void op_B9(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 4) {
+    get_arg_absolute_index(cpu, cpu->Y);
+    return;
+  }
+  do_LD_(cpu, &cpu->A);
+  fetch(cpu);
+}
+
+// TSX
+void op_BA(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      cpu->X = cpu->S;
+      fetch(cpu);
+    break;
+  }
+}
+
+// LDY abs, X
+void op_BC(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 4) {
+    get_arg_absolute_index(cpu, cpu->X);
+    return;
+  }
+  do_LD_(cpu, &cpu->Y);
+  fetch(cpu);
+}
+
+// LDA abs, X
+void op_BD(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 4) {
+    get_arg_absolute_index(cpu, cpu->X);
+    return;
+  }
+  do_LD_(cpu, &cpu->A);
+  fetch(cpu);
+}
+
+// LDX abs, Y
+void op_BE(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 4) {
+    get_arg_absolute_index(cpu, cpu->Y);
+    return;
+  }
+  do_LD_(cpu, &cpu->X);
+  fetch(cpu);
+}
+
+// CPY imm
+void op_C0(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC++;
+    break;
+    case 1:
+      do_CMP(cpu, cpu->Y, *cpu->data_bus);
+      fetch(cpu);
+    break;
+  }
+}
+
+// CMP X, ind
+void op_C1(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 5) {
+    get_arg_index_indirect(cpu);
+    return;
+  }
+  do_CMP(cpu, cpu->A, *cpu->data_bus);
+  fetch(cpu);
+}
+
+// CPY zpg
+void op_C4(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 2) {
+    get_arg_zero_page(cpu);
+    return;
+  }
+  do_CMP(cpu, cpu->Y, *cpu->data_bus);
+  fetch(cpu);
+}
+
+// CMP zpg
+void op_C5(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 2) {
+    get_arg_zero_page(cpu);
+    return;
+  }
+  do_CMP(cpu, cpu->A, *cpu->data_bus);
+  fetch(cpu);
+}
+
+// DEC zpg
+void op_C6(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 2) {
+    get_arg_zero_page(cpu);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 2:
+      cpu->AD = *cpu->data_bus;
+      cpu->RW = false;
+    break;
+    case 3:
+      cpu->AD--;
+      update_flags_register(cpu, cpu->AD);
+      *cpu->data_bus = cpu->AD;
+      cpu->RW = false;
+    break;
+    case 4:
+      fetch(cpu);
+    break;
+  }
+}
+
+// INY
+void op_C8(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      cpu->Y++;
+      update_flags_register(cpu, cpu->Y);
+      fetch(cpu);
+    break;
+  }
+}
+
+// CMP imm
+void op_C9(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC++;
+    break;
+    case 1:
+      do_CMP(cpu, cpu->A, *cpu->data_bus);
+      fetch(cpu);
+    break;
+  }
+}
+
+// DEX
+void op_CA(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      cpu->X--;
+      update_flags_register(cpu, cpu->X);
+      fetch(cpu);
+    break;
+  }
+}
+
+// CPY abs
+void op_CC(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_absolute(cpu);
+    return;
+  }
+  do_CMP(cpu, cpu->Y, *cpu->data_bus);
+  fetch(cpu);
+}
+
+// CMP abs
+void op_CD(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_absolute(cpu);
+    return;
+  }
+  do_CMP(cpu, cpu->A, *cpu->data_bus);
+  fetch(cpu);
+}
+
+// DEC abs
+void op_CE(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_absolute(cpu);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 3:
+      cpu->AD = *cpu->data_bus;
+      cpu->RW = false;
+    break;
+    case 4:
+      cpu->AD--;
+      update_flags_register(cpu, cpu->AD);
+      *cpu->data_bus = cpu->AD;
+      cpu->RW = false;
+    break;
+    case 5:
+      fetch(cpu);
+    break;
+  }
+}
+
+// BNE
+void op_D0(M6502* cpu) {
+  branch(cpu, !(cpu->status & STATUS_ZF));
+}
+
+// CMP ind, Y
+void op_D1(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 5) {
+    get_arg_indirect_index(cpu);
+    return;
+  }
+  do_CMP(cpu, cpu->A, *cpu->data_bus);
+  fetch(cpu);
+}
+
+// CMP zpg, X
+void op_D5(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_zero_page_index(cpu, cpu->X);
+    return;
+  }
+  do_CMP(cpu, cpu->A, *cpu->data_bus);
+  fetch(cpu);
+}
+
+// DEC zpg, X
+void op_D6(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_zero_page_index(cpu, cpu->X);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 3:
+      cpu->AD = *cpu->data_bus;
+      cpu->RW = false;
+    break;
+    case 4:
+      cpu->AD--;
+      update_flags_register(cpu, cpu->AD);
+      *cpu->data_bus = cpu->AD;
+      cpu->RW = false;
+    break;
+    case 5:
+      fetch(cpu);
+    break;
+  }
+}
+
+// CLD
+void op_D8(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      cpu->status &= ~STATUS_DF;
+      fetch(cpu);
+    break;
+  }
+}
+
+// CMP abs, Y
+void op_D9(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 4) {
+    get_arg_absolute_index(cpu, cpu->Y);
+    return;
+  }
+  do_CMP(cpu, cpu->A, *cpu->data_bus);
+  fetch(cpu);
+}
+
+// CMP abs, X
+void op_DD(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 4) {
+    get_arg_absolute_index(cpu, cpu->X);
+    return;
+  }
+  do_CMP(cpu, cpu->A, *cpu->data_bus);
+  fetch(cpu);
+}
+
+// DEC abs, X
+void op_DE(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 4) {
+    get_arg_absolute_index(cpu, cpu->X);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 4:
+      cpu->AD = *cpu->data_bus;
+      cpu->RW = false;
+    break;
+    case 5:
+      cpu->AD--;
+      update_flags_register(cpu, cpu->AD);
+      *cpu->data_bus = cpu->AD;
+      cpu->RW = false;
+    break;
+    case 6:
+      fetch(cpu);
+    break;
+  }
+}
+
+// CPX imm
+void op_E0(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC++;
+    break;
+    case 1:
+      do_CMP(cpu, cpu->X, *cpu->data_bus);
+      fetch(cpu);
+    break;
+  }
+}
+
+// SBC X, ind
+void op_E1(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 5) {
+    get_arg_index_indirect(cpu);
+    return;
+  }
+  do_SBC(cpu);
+  fetch(cpu);
+}
+
+// CPX zpg
+void op_E4(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 2) {
+    get_arg_zero_page(cpu);
+    return;
+  }
+  do_CMP(cpu, cpu->X, *cpu->data_bus);
+  fetch(cpu);
+}
+
+// SBC zpg
+void op_E5(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 2) {
+    get_arg_zero_page(cpu);
+    return;
+  }
+  do_SBC(cpu);
+  fetch(cpu);
+}
+
+// INC zpg
+void op_E6(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 2) {
+    get_arg_zero_page(cpu);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 2:
+      cpu->AD = *cpu->data_bus;
+      cpu->RW = false;
+    break;
+    case 3:
+      cpu->AD++;
+      update_flags_register(cpu, cpu->AD);
+      *cpu->data_bus = cpu->AD;
+      cpu->RW = false;
+    break;
+    case 4:
+      fetch(cpu);
+    break;
+  }
+}
+
+// INX
+void op_E8(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      cpu->X++;
+      update_flags_register(cpu, cpu->X);
+      fetch(cpu);
+    break;
+  }
+}
+
+// SBC imm
+void op_E9(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC++;
+    break;
+    case 1:
+      do_SBC(cpu);
+      fetch(cpu);
+    break;
+  }
+}
+
+// NOP
+void op_EA(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      fetch(cpu);
+    break;
+  }
+}
+
+// CPX abs
+void op_EC(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_absolute(cpu);
+    return;
+  }
+  do_CMP(cpu, cpu->X, *cpu->data_bus);
+  fetch(cpu);
+}
+
+// SBC abs
+void op_ED(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_absolute(cpu);
+    return;
+  }
+  do_SBC(cpu);
+  fetch(cpu);
+}
+
+// INC abs
+void op_EE(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_absolute(cpu);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 3:
+      cpu->AD = *cpu->data_bus;
+      cpu->RW = false;
+    break;
+    case 4:
+      cpu->AD++;
+      update_flags_register(cpu, cpu->AD);
+      *cpu->data_bus = cpu->AD;
+      cpu->RW = false;
+    break;
+    case 5:
+      fetch(cpu);
+    break;
+  }
+}
+
+// BEQ
+void op_F0(M6502* cpu) {
+  branch(cpu, cpu->status & STATUS_ZF);
+}
+
+// SBC ind, Y
+void op_F1(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 5) {
+    get_arg_indirect_index(cpu);
+    return;
+  }
+  do_SBC(cpu);
+  fetch(cpu);
+}
+
+// SBC zpg, X
+void op_F5(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_zero_page_index(cpu, cpu->X);
+    return;
+  }
+  do_SBC(cpu);
+  fetch(cpu);
+}
+
+// INC zpg, X
+void op_F6(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
+    get_arg_zero_page_index(cpu, cpu->X);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 3:
+      cpu->AD = *cpu->data_bus;
+      cpu->RW = false;
+    break;
+    case 4:
+      cpu->AD++;
+      update_flags_register(cpu, cpu->AD);
+      *cpu->data_bus = cpu->AD;
+      cpu->RW = false;
+    break;
+    case 5:
+      fetch(cpu);
+    break;
+  }
+}
+
+// SED
+void op_F8(M6502* cpu) {
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 0:
+      *cpu->addr_bus = cpu->PC;
+    break;
+    case 1:
+      cpu->status |= STATUS_DF;
+      fetch(cpu);
+    break;
+  }
+}
+
+// SBC abs, Y
+void op_F9(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 4) {
+    get_arg_absolute_index(cpu, cpu->Y);
+    return;
+  }
+  do_SBC(cpu);
+  fetch(cpu);
+}
+
+// SBC abs, X
+void op_FD(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 4) {
+    get_arg_absolute_index(cpu, cpu->X);
+    return;
+  }
+  do_SBC(cpu);
+  fetch(cpu);
+}
+
+// INC abs, X
+void op_FE(M6502* cpu) {
+  if((cpu->IR & IR_STATUS_MASK) < 4) {
+    get_arg_absolute_index(cpu, cpu->X);
+    return;
+  }
+  switch(cpu->IR & IR_STATUS_MASK) {
+    case 4:
+      cpu->AD = *cpu->data_bus;
+      cpu->RW = false;
+    break;
+    case 5:
+      cpu->AD++;
+      update_flags_register(cpu, cpu->AD);
+      *cpu->data_bus = cpu->AD;
+      cpu->RW = false;
+    break;
+    case 6:
+      fetch(cpu);
+    break;
+  }
+}
+
+
 opcode_func opcode[0x100] = {
   &op_00,&op_01,&op_XX,&op_XX,&op_XX,&op_05,&op_06,&op_XX,&op_08,&op_09,&op_0A,&op_XX,&op_XX,&op_0D,&op_0E,&op_XX,
   &op_10,&op_11,&op_XX,&op_XX,&op_XX,&op_15,&op_16,&op_XX,&op_18,&op_19,&op_XX,&op_XX,&op_XX,&op_1D,&op_1E,&op_XX,
   &op_20,&op_21,&op_XX,&op_XX,&op_24,&op_25,&op_26,&op_XX,&op_28,&op_29,&op_2A,&op_XX,&op_2C,&op_2D,&op_2E,&op_XX,
-  &op_30,&op_31,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,
-  &op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,
-  &op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,
-  &op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_6C,&op_XX,&op_XX,&op_XX,
-  &op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,
-  &op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,
-  &op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,
-  &op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,
-  &op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,
-  &op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,
-  &op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,
-  &op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,
-  &op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX,&op_XX
+  &op_30,&op_31,&op_XX,&op_XX,&op_XX,&op_35,&op_36,&op_XX,&op_38,&op_39,&op_XX,&op_XX,&op_XX,&op_3D,&op_3E,&op_XX,
+  &op_40,&op_41,&op_XX,&op_XX,&op_XX,&op_45,&op_46,&op_XX,&op_48,&op_49,&op_4A,&op_XX,&op_4C,&op_4D,&op_4E,&op_XX,
+  &op_50,&op_51,&op_XX,&op_XX,&op_XX,&op_55,&op_56,&op_XX,&op_58,&op_59,&op_XX,&op_XX,&op_XX,&op_5D,&op_5E,&op_XX,
+  &op_60,&op_61,&op_XX,&op_XX,&op_XX,&op_65,&op_66,&op_XX,&op_68,&op_69,&op_6A,&op_XX,&op_6C,&op_6D,&op_6E,&op_XX,
+  &op_70,&op_71,&op_XX,&op_XX,&op_XX,&op_75,&op_76,&op_XX,&op_78,&op_79,&op_XX,&op_XX,&op_XX,&op_7D,&op_7E,&op_XX,
+  &op_XX,&op_81,&op_XX,&op_XX,&op_84,&op_85,&op_86,&op_XX,&op_88,&op_XX,&op_8A,&op_XX,&op_8C,&op_8D,&op_8E,&op_XX,
+  &op_90,&op_91,&op_XX,&op_XX,&op_94,&op_95,&op_96,&op_XX,&op_98,&op_99,&op_9A,&op_XX,&op_XX,&op_9D,&op_XX,&op_XX,
+  &op_A0,&op_A1,&op_A2,&op_XX,&op_A4,&op_A5,&op_A6,&op_XX,&op_A8,&op_A9,&op_AA,&op_XX,&op_AC,&op_AD,&op_AE,&op_XX,
+  &op_B0,&op_B1,&op_XX,&op_XX,&op_B4,&op_B5,&op_B6,&op_XX,&op_B8,&op_B9,&op_BA,&op_XX,&op_BC,&op_BD,&op_BE,&op_XX,
+  &op_C0,&op_C1,&op_XX,&op_XX,&op_C4,&op_C5,&op_C6,&op_XX,&op_C8,&op_C9,&op_CA,&op_XX,&op_CC,&op_CD,&op_CE,&op_XX,
+  &op_D0,&op_D1,&op_XX,&op_XX,&op_XX,&op_D5,&op_D6,&op_XX,&op_D8,&op_D9,&op_XX,&op_XX,&op_XX,&op_DD,&op_DE,&op_XX,
+  &op_E0,&op_E1,&op_XX,&op_XX,&op_E4,&op_E5,&op_E6,&op_XX,&op_E8,&op_E9,&op_EA,&op_XX,&op_EC,&op_ED,&op_EE,&op_XX,
+  &op_F0,&op_F1,&op_XX,&op_XX,&op_XX,&op_F5,&op_F6,&op_XX,&op_F8,&op_F9,&op_XX,&op_XX,&op_XX,&op_FD,&op_FE,&op_XX
 };
 
 void run_opcode(M6502* cpu)  {

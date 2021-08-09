@@ -181,8 +181,7 @@ int boot_apple1(unsigned int perf_counter_freq) {
   }
   // Send SIGINT to the input thread so that the read syscall gets interrupted
   if(pthread_kill(input_thread, SIGINT)) {
-    fprintf(stderr, "Error signaling input thread\n");
-    return ERROR_PTHREAD_SIGNAL;
+    fprintf(stderr, "Error signaling input thread, it probably already finished\n");
   }
 
   if(pthread_join(clock_thread, NULL)) {

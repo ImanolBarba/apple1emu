@@ -129,10 +129,19 @@ void get_arg_absolute_index(M6502* cpu, uint8_t index);
 // Instruction stuff
 void do_ORA(M6502* cpu);
 void do_AND(M6502* cpu);
+void do_EOR(M6502* cpu);
+void do_ADC(M6502* cpu);
+void do_SBC(M6502* cpu);
+void do_BIT(M6502* cpu);
+void do_LD_(M6502* cpu, int8_t* reg);
+void do_CMP(M6502* cpu, uint8_t A, uint8_t B);
 uint8_t do_ROL(M6502* cpu, uint8_t x);
 uint8_t do_ASL(M6502* cpu, uint8_t x);
+uint8_t do_LSR(M6502* cpu, uint8_t x);
+uint8_t do_ROR(M6502* cpu, uint8_t x);
 void branch(M6502* cpu, bool condition);
 void fetch(M6502* cpu);
 void push_stack(M6502* cpu, uint8_t data);
+void update_flags_register(M6502* cpu, uint8_t reg);
 
 #endif

@@ -134,6 +134,15 @@ void get_arg_absolute_index(M6502* cpu, uint8_t index) {
   }
 }
 
+void update_flags_register(M6502* cpu, uint8_t reg) {
+  cpu->status &= ~(STATUS_NF | STATUS_ZF);
+  if(reg & STATUS_NF) {
+    cpu->status |= STATUS_NF;
+  } else if(!reg) {
+    cpu->status |= STATUS_ZF;
+  }
+}
+
 void branch(M6502* cpu, bool condition) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
@@ -175,45 +184,166 @@ void push_stack(M6502* cpu, uint8_t data) {
 
 void do_ORA(M6502* cpu) {
   cpu->A |= *cpu->data_bus;
-  if(cpu->A < 0) {
-    cpu->status |= STATUS_NF;
-  } else if(!cpu->A) {
-    cpu->status |= STATUS_ZF;
-  }
+  update_flags_register(cpu, cpu->A);
 }
 
 void do_AND(M6502* cpu) {
   cpu->A &= *cpu->data_bus;
-  if(cpu->A < 0) {
-    cpu->status |= STATUS_NF;
-  } else if(!cpu->A) {
+  update_flags_register(cpu, cpu->A);
+}
+
+void do_EOR(M6502* cpu) {
+  cpu->A ^= *cpu->data_bus;
+  update_flags_register(cpu, cpu->A);
+}
+
+void do_BIT(M6502* cpu) {
+  cpu->status &= ~(STATUS_ZF | STATUS_NF | STATUS_VF);
+  if(!(cpu->A & *cpu->data_bus)) {
     cpu->status |= STATUS_ZF;
+  }
+  cpu->status = (cpu->status & 0x3F) | (*cpu->data_bus & 0xC0);
+}
+
+void do_ADC(M6502* cpu) {
+  int8_t prev_value = cpu->A;
+  uint16_t new_value = 0;
+  if(cpu->status & STATUS_DF) {
+    // Decimal mode
+    // According to tests, decimal will basically split the first nibble and
+    // times it x10, then add the second one. This means that 0x8C in decimal
+    // mode is in fact 92 (0x8 * 10 + 0xC).
+    uint8_t lo_sum = (cpu->A & 0x0F) + (*cpu->data_bus & 0x0F) + (cpu->status & STATUS_CF);
+    uint8_t hi_sum = ((cpu->A & 0xF0) + (*cpu->data_bus & 0xF0)) >> 4;
+    uint8_t lo_digit = lo_sum % 10;
+    uint8_t hi_digit = hi_sum % 10 + lo_sum / 10;
+    cpu->status &= ~(STATUS_VF | STATUS_CF);
+    if(hi_digit/10) {
+      cpu->status |= STATUS_CF;
+      hi_digit = (hi_digit/10) - 1;
+    }
+    new_value = (uint16_t)(lo_digit|(hi_digit << 4));
+  } else {
+    // Normal
+    new_value = (cpu->A + *cpu->data_bus + (cpu->status & STATUS_CF));
+    cpu->status &= ~(STATUS_VF | STATUS_CF);
+    if(new_value > 0xFF) {
+      cpu->status |= STATUS_CF;
+    }
+  }
+  // Overflow, Negative and Zero flags behave the same for binary and decimal
+  // mode. In fact, Overflow is undefined behaviour in decimal mode since BCD
+  // is unsigned, but some tests I checked seemed to define the same behaviour
+  // than binary mode
+  if (~(prev_value^*cpu->data_bus) & (prev_value^new_value) & 0x80) {
+    // In short, if the operands are not of opposing signs and the result is, it
+    // means we overflowed, since the result should have the same sign as the
+    // original value otherwise.
+      cpu->status |= STATUS_VF;
+  }
+  cpu->A = (int8_t)new_value;
+  update_flags_register(cpu, cpu->A);
+}
+
+void do_SBC(M6502* cpu) {
+  int8_t prev_value = cpu->A;
+  uint16_t new_value = 0;
+  if(cpu->status & STATUS_DF) {
+    // Decimal mode
+    int8_t lo_digit = (cpu->A & 0x0F) - (*cpu->data_bus & 0x0F) - ~(cpu->status & STATUS_CF);
+    uint8_t hi_digit = ((cpu->A & 0xF0) - (*cpu->data_bus & 0xF0)) >> 4;
+    if(lo_digit < 0) {
+      lo_digit += 10;
+      hi_digit--;
+    }
+    if(hi_digit < 0) {
+      hi_digit += 10;
+      // We don't set CF because BCD is unsigned
+    }
+    new_value = (uint16_t)(lo_digit|(hi_digit << 4));
+  } else {
+    // Normal
+    //
+    // Note that the carry is negated. An interesting note from the MCS65XX
+    // manual:
+    //
+    // When the SBC instruction is used in single precision subtraction, there
+    // will normally be no borrow; therefore, the programmer must set the carry
+    // flag, by using the SEC (Set carry to 1) instruction, before using the SBC
+    // instruction
+    new_value = (cpu->A - *cpu->data_bus - (~cpu->status & STATUS_CF));
+    cpu->status &= ~(STATUS_VF | STATUS_CF);
+    if(new_value <= 0xFF) {
+      // Substraction has negated carry (borrow)
+      cpu->status |= STATUS_CF;
+    }
+  }
+  // Overflow, Negative and Zero flags behave the same for binary and decimal
+  // mode. In fact, Overflow is undefined behaviour in decimal mode since BCD
+  // is unsigned, but some tests I checked seemed to define the same behaviour
+  // than binary mode
+  if ((prev_value^*cpu->data_bus) & (prev_value^new_value) & 0x80) {
+    // Substraction is different, if the operands ARE of opposing signs and the
+    // result is too, it means we overflowed. For instance:
+    // NEG - POS -> must be NEG (If pos, we went below -128)
+    // POS - (-NEG) -> must be POS (Basically because it's an addition)
+      cpu->status |= STATUS_VF;
+  }
+  cpu->A = (int8_t)new_value;
+  update_flags_register(cpu, cpu->A);
+}
+
+void do_LD_(M6502* cpu, int8_t* reg) {
+  *reg = *cpu->data_bus;
+  update_flags_register(cpu, *reg);
+}
+
+void do_CMP(M6502* cpu, uint8_t A, uint8_t B) {
+  uint16_t comp = A - B;
+  update_flags_register(cpu, (uint8_t)comp);
+  cpu->status &= ~STATUS_CF;
+  if(comp > 0xFF) {
+    cpu->status |= STATUS_CF;
   }
 }
 
 uint8_t do_ASL(M6502* cpu, uint8_t x) {
   uint8_t res = x << 1;
+  cpu->status &= ~STATUS_CF;
   if(x & 0x80) {
     cpu->status |= STATUS_CF;
   }
-  if(cpu->A < 0) {
-    cpu->status |= STATUS_NF;
-  } else if(!cpu->A) {
-    cpu->status |= STATUS_ZF;
-  }
+  update_flags_register(cpu, cpu->A);
   return res;
 }
 
 uint8_t do_ROL(M6502* cpu, uint8_t x) {
   uint8_t res = x << 1 | (cpu->status & STATUS_CF) ;
+  cpu->status &= ~STATUS_CF;
   if(x & 0x80) {
     cpu->status |= STATUS_CF;
   }
-  if(cpu->A < 0) {
-    cpu->status |= STATUS_NF;
-  } else if(!cpu->A) {
-    cpu->status |= STATUS_ZF;
+  update_flags_register(cpu, cpu->A);
+  return res;
+}
+
+uint8_t do_LSR(M6502* cpu, uint8_t x) {
+  uint8_t res = x >> 1;
+  cpu->status &= ~STATUS_CF;
+  if(x & 0x01) {
+    cpu->status |= STATUS_CF;
   }
+  update_flags_register(cpu, cpu->A);
+  return res;
+}
+
+uint8_t do_ROR(M6502* cpu, uint8_t x) {
+  uint8_t res = x >> 1 | ((cpu->status & STATUS_CF) << 8);
+  cpu->status &= ~STATUS_CF;
+  if(x & 0x01) {
+    cpu->status |= STATUS_CF;
+  }
+  update_flags_register(cpu, cpu->A);
   return res;
 }
 
@@ -420,6 +550,10 @@ void cpu_cycle(M6502* cpu) {
   if(!*cpu->RDY && cpu->RW) {
     // RDY is only checked during READ cycle on the original 6502
     return;
+  }
+
+  if(!*cpu->SO) {
+    cpu->status |= STATUS_VF;
   }
 
   if(cpu->SYNC) {

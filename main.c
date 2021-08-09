@@ -114,8 +114,8 @@ int main(int argc, char** argv) {
   /* Set up the structure to specify the new action. */
   act.sa_handler = termination_handler;
   sigemptyset(&act.sa_mask);
-  act.sa_flags &= ~SA_RESTART;
-  act.sa_flags &= ~SA_RESETHAND;
+  //act.sa_flags &= ~SA_RESTART;
+  //act.sa_flags &= ~SA_RESETHAND;
 
   if(sigaction(SIGINT, &act, NULL) == -1) {
 		fprintf(stderr, "Unable to set SIGINT handler");
