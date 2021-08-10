@@ -438,9 +438,9 @@ void op_2A(M6502* cpu) {
   }
 }
 
-// BIT zpg
+// BIT abs
 void op_2C(M6502* cpu) {
-if((cpu->IR & IR_STATUS_MASK) < 3) {
+  if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute(cpu);
     return;
   }
@@ -690,7 +690,7 @@ void op_4A(M6502* cpu) {
 
 // JMP abs
 void op_4C(M6502* cpu) {
-switch(cpu->IR & IR_STATUS_MASK) {
+  switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
     break;
@@ -1613,6 +1613,7 @@ void op_BA(M6502* cpu) {
     break;
     case 1:
       cpu->X = cpu->S;
+      update_flags_register(cpu, cpu->X);
       fetch(cpu);
     break;
   }

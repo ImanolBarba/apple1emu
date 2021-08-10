@@ -209,15 +209,15 @@ void do_BIT(M6502* cpu) {
 }
 
 void do_ADC(M6502* cpu) {
-  int8_t prev_value = cpu->A;
+  uint8_t prev_value = cpu->A;
   uint16_t new_value = 0;
   if(cpu->status & STATUS_DF) {
     // Decimal mode
     // According to tests, decimal will basically split the first nibble and
     // times it x10, then add the second one. This means that 0x8C in decimal
     // mode is in fact 92 (0x8 * 10 + 0xC).
-    uint8_t lo_sum = (cpu->A & 0x0F) + (*cpu->data_bus & 0x0F) + (cpu->status & STATUS_CF);
-    uint8_t hi_sum = ((cpu->A & 0xF0) + (*cpu->data_bus & 0xF0)) >> 4;
+    uint8_t lo_sum = (prev_value & 0x0F) + (*cpu->data_bus & 0x0F) + (cpu->status & STATUS_CF);
+    uint8_t hi_sum = ((prev_value & 0xF0) + (*cpu->data_bus & 0xF0)) >> 4;
     uint8_t lo_digit = lo_sum % 10;
     uint8_t hi_digit = hi_sum % 10 + lo_sum / 10;
     cpu->status &= ~(STATUS_VF | STATUS_CF);
@@ -228,9 +228,9 @@ void do_ADC(M6502* cpu) {
     new_value = (uint16_t)(lo_digit|(hi_digit << 4));
   } else {
     // Normal
-    new_value = (cpu->A + *cpu->data_bus + (cpu->status & STATUS_CF));
+    new_value = (prev_value + *cpu->data_bus + (cpu->status & STATUS_CF));
     cpu->status &= ~(STATUS_VF | STATUS_CF);
-    if(new_value > 0xFF) {
+    if(new_value & 0xFF00) {
       cpu->status |= STATUS_CF;
     }
   }
@@ -297,7 +297,7 @@ void do_SBC(M6502* cpu) {
 }
 
 void do_LD_(M6502* cpu, int8_t* reg) {
-  *reg = *cpu->data_bus;
+  *reg = (uint8_t)*cpu->data_bus;
   update_flags_register(cpu, *reg);
 }
 
@@ -316,7 +316,7 @@ uint8_t do_ASL(M6502* cpu, uint8_t x) {
   if(x & 0x80) {
     cpu->status |= STATUS_CF;
   }
-  update_flags_register(cpu, cpu->A);
+  update_flags_register(cpu, res);
   return res;
 }
 
@@ -326,7 +326,7 @@ uint8_t do_ROL(M6502* cpu, uint8_t x) {
   if(x & 0x80) {
     cpu->status |= STATUS_CF;
   }
-  update_flags_register(cpu, cpu->A);
+  update_flags_register(cpu, res);
   return res;
 }
 
@@ -336,17 +336,17 @@ uint8_t do_LSR(M6502* cpu, uint8_t x) {
   if(x & 0x01) {
     cpu->status |= STATUS_CF;
   }
-  update_flags_register(cpu, cpu->A);
+  update_flags_register(cpu, res);
   return res;
 }
 
 uint8_t do_ROR(M6502* cpu, uint8_t x) {
-  uint8_t res = x >> 1 | ((cpu->status & STATUS_CF) << 8);
+  uint8_t res = (x >> 1) | ((cpu->status & STATUS_CF) << 8);
   cpu->status &= ~STATUS_CF;
   if(x & 0x01) {
     cpu->status |= STATUS_CF;
   }
-  update_flags_register(cpu, cpu->A);
+  update_flags_register(cpu, res);
   return res;
 }
 
@@ -357,8 +357,9 @@ void cpu_crash(M6502* cpu) {
   fprintf(stderr, "PC=0x%04X\n", cpu->PC);
   fprintf(stderr, "S=0x%02X\n", cpu->S);
   fprintf(stderr, "P=0x%02X\n", cpu->status);
-  fprintf(stderr, "X=0x%02X\n", cpu->X);
-  fprintf(stderr, "Y=0x%02X\n", cpu->Y);
+  fprintf(stderr, "A=0x%02X\n", (uint8_t)cpu->A);
+  fprintf(stderr, "X=0x%02X\n", (uint8_t)cpu->X);
+  fprintf(stderr, "Y=0x%02X\n", (uint8_t)cpu->Y);
   fprintf(stderr, "\n");
 
   fprintf(stderr, "== INTERNAL STATUS ==\n");
