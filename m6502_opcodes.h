@@ -26,5 +26,6 @@
 #define IR_STATUS_MASK 0x7
 
 void run_opcode(M6502* cpu);
+bool is_write_opcode(uint8_t op);
 
 #endif

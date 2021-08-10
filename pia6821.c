@@ -78,6 +78,9 @@ void process_peripheral_A(PIA6821* p) {
     char translated_char = ascii_to_apple[pressed_key];
     if(translated_char != 0x00) {
       // The Apple I has PA7 always high
+      if(translated_char == 0x0D) {
+        data_ready = false;
+      }
       p->PA = (uint8_t)translated_char | 0x80;
       p->CRA |= 0x80;
       data_ready = false;
@@ -101,7 +104,17 @@ void process_peripheral_B(PIA6821* p) {
 
 void clock_pia(void* ptr, bool status) {
   PIA6821* p = (PIA6821*)ptr;
+  uint8_t* selected_data_register_A = &(p->DDRA);
+  uint8_t* selected_data_register_B = &(p->DDRB);
   if(status) {
+    if(p->CRA & DDR_FLAG) {
+      // If the 2nd bit in the CR is set, the data register point to the
+      // peripheral register, not the data direction one
+      selected_data_register_A = &(p->PA);
+    }
+    if(p->CRB & DDR_FLAG) {
+      selected_data_register_B = &(p->PB);
+    }
     process_peripheral_A(p);
     process_peripheral_B(p);
     if(*p->RW) {
@@ -110,22 +123,24 @@ void clock_pia(void* ptr, bool status) {
       } else if(*p->addr_bus == p->CRB_ADDR) {
         *p->data_bus = p->CRB;
       } else if(*p->addr_bus == p->PA_ADDR) {
-        *p->data_bus = p->PA;
+        *p->data_bus = *selected_data_register_A;
         // Lower high bit, signaling that the character has been read and the register is available for kbd input
         p->CRA &= 0x7F;
       } else if(*p->addr_bus == p->PB_ADDR) {
-        *p->data_bus = p->PB;
+        *p->data_bus = *selected_data_register_B;
       }
     } else {
       if(*p->addr_bus == p->CRA_ADDR) {
-        p->CRA = *p->data_bus;
+        // Bits 6 and 7 are RO
+        p->CRA = *p->data_bus & 0x3F;
       } else if(*p->addr_bus == p->CRB_ADDR) {
+        // Bits 6 and 7 are RO
         p->CRB = *p->data_bus;
       } else if(*p->addr_bus == p->PA_ADDR) {
-        p->PA = *p->data_bus;
+        *selected_data_register_A = *p->data_bus;
       } else if(*p->addr_bus == p->PB_ADDR) {
         // Not only set to value, but raise last bit
-        p->PB = *p->data_bus | 0x80;
+        *selected_data_register_B = *p->data_bus | 0x80;
       }
     }
   }

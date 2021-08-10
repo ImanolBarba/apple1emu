@@ -25,6 +25,17 @@
 
 typedef void (*opcode_func)(M6502*);
 
+bool is_write_opcode(uint8_t op) {
+  // Not ideal, but hey, it works
+  return (op == 0x0A || op == 0x06 || op == 0x16 || op == 0x0E || op == 0x1E ||
+          op == 0x85 || op == 0x95 || op == 0x8D || op == 0x9D || op == 0x99 ||
+          op == 0x81 || op == 0x91 || op == 0xC6 || op == 0xD6 || op == 0xCE ||
+          op == 0xDE || op == 0xE6 || op == 0xF6 || op == 0xEE || op == 0xFE ||
+          op == 0x4A || op == 0x46 || op == 0x56 || op == 0x4E || op == 0x5E ||
+          op == 0x6A || op == 0x66 || op == 0x76 || op == 0x6E || op == 0x7E ||
+          op == 0x2A || op == 0x26 || op == 0x36 || op == 0x2E || op == 0x3E);
+}
+
 // UNDEF
 void op_XX(M6502* cpu) {
   fprintf(stderr, "Unknown opcode: 0x%02X\n", cpu->IR >> 3);
@@ -316,10 +327,10 @@ void op_20(M6502* cpu) {
       *cpu->addr_bus = STACK_BASE_ADDR | cpu->S;
     break;
     case 2:
-      push_stack(cpu, cpu->PC >> 8);
+      push_stack(cpu, *cpu->PCH);
     break;
     case 3:
-      push_stack(cpu, cpu->PC);
+      push_stack(cpu, *cpu->PCL);
     break;
     case 4:
       *cpu->addr_bus = cpu->PC;
@@ -582,7 +593,7 @@ void op_40(M6502* cpu) {
     break;
     case 3:
       *cpu->addr_bus = STACK_TOP_ADDR | cpu->S++;
-      cpu->status = (*cpu->data_bus | STATUS_BF) & ~STATUS_BF;
+      cpu->status = (*cpu->data_bus | STATUS_BF) & ~STATUS_XF;
     break;
     case 4:
       *cpu->addr_bus = STACK_TOP_ADDR | cpu->S;
@@ -1240,7 +1251,7 @@ void op_8E(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 2:
       get_arg_absolute(cpu);
-      *cpu->data_bus = cpu->Y;
+      *cpu->data_bus = cpu->X;
       cpu->RW = false;
     break;
     case 3:
@@ -1316,7 +1327,7 @@ void op_96(M6502* cpu) {
   }
   switch(cpu->IR & IR_STATUS_MASK) {
     case 2:
-      get_arg_zero_page_index(cpu, cpu->X);
+      get_arg_zero_page_index(cpu, cpu->Y);
       *cpu->data_bus = cpu->X;
       cpu->RW = false;
     break;

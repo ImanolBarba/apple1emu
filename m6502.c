@@ -28,7 +28,7 @@
 #include <errno.h>
 
 void get_arg_indirect_index(M6502* cpu) {
-    switch(cpu->IR & 0x3) {
+    switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
     break;
@@ -43,7 +43,7 @@ void get_arg_indirect_index(M6502* cpu) {
     case 3:
       cpu->AD |= *cpu->data_bus << 8; // full addr
       *cpu->addr_bus = (cpu->AD & 0xFF00) | ((cpu->AD + cpu->Y) & 0x00FF);
-      if((cpu->AD & 0x00FF) + cpu->Y <= 0xFF) {
+      if(((cpu->AD & 0x00FF) + cpu->Y <= 0xFF) && !is_write_opcode(cpu->IR >> 3)) {
         // if we're on the same page already, 1 less cycle
         cpu->IR++;
       }
@@ -55,7 +55,7 @@ void get_arg_indirect_index(M6502* cpu) {
 }
 
 void get_arg_index_indirect(M6502* cpu) {
-  switch(cpu->IR & 0x3) {
+  switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
     break;
@@ -78,7 +78,7 @@ void get_arg_index_indirect(M6502* cpu) {
 }
 
 void get_arg_zero_page(M6502* cpu) {
-  switch(cpu->IR & 0x3) {
+  switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
     break;
@@ -90,7 +90,7 @@ void get_arg_zero_page(M6502* cpu) {
 }
 
 void get_arg_zero_page_index(M6502* cpu, uint8_t index) {
-  if((cpu->IR & 0x3) < 2) {
+  if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page(cpu);
     return;
   }
@@ -98,7 +98,7 @@ void get_arg_zero_page_index(M6502* cpu, uint8_t index) {
 }
 
 void get_arg_absolute(M6502* cpu) {
-  switch(cpu->IR & 0x3) {
+  switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
     break;
@@ -113,7 +113,7 @@ void get_arg_absolute(M6502* cpu) {
 }
 
 void get_arg_absolute_index(M6502* cpu, uint8_t index) {
-  switch(cpu->IR & 0x3) {
+  switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
     break;
@@ -124,7 +124,10 @@ void get_arg_absolute_index(M6502* cpu, uint8_t index) {
     case 2:
       cpu->AD |= *cpu->data_bus << 8;
       *cpu->addr_bus = (cpu->AD & 0xFF00) | ((cpu->AD + index) & 0x00FF);
-      if((cpu->AD & 0x00FF) + index <= 0xFF) {
+      if(((cpu->AD & 0x00FF) + index <= 0xFF) && !is_write_opcode(cpu->IR >> 3)) {
+        // Opcodes that write to the data bus while using this addressing always
+        // take 1 extra cycle irregardless of whether or not the destination is
+        // in the same page, so in that case, skip this skip.
         cpu->IR++;
       }
     break;
@@ -246,12 +249,12 @@ void do_ADC(M6502* cpu) {
 }
 
 void do_SBC(M6502* cpu) {
-  int8_t prev_value = cpu->A;
+  uint8_t prev_value = (uint8_t)cpu->A;
   uint16_t new_value = 0;
   if(cpu->status & STATUS_DF) {
     // Decimal mode
-    int8_t lo_digit = (cpu->A & 0x0F) - (*cpu->data_bus & 0x0F) - ~(cpu->status & STATUS_CF);
-    uint8_t hi_digit = ((cpu->A & 0xF0) - (*cpu->data_bus & 0xF0)) >> 4;
+    int8_t lo_digit = (prev_value & 0x0F) - (*cpu->data_bus & 0x0F) - ~(cpu->status & STATUS_CF);
+    uint8_t hi_digit = ((prev_value & 0xF0) - (*cpu->data_bus & 0xF0)) >> 4;
     if(lo_digit < 0) {
       lo_digit += 10;
       hi_digit--;
@@ -271,10 +274,10 @@ void do_SBC(M6502* cpu) {
     // will normally be no borrow; therefore, the programmer must set the carry
     // flag, by using the SEC (Set carry to 1) instruction, before using the SBC
     // instruction
-    new_value = (cpu->A - *cpu->data_bus - (~cpu->status & STATUS_CF));
+    new_value = (prev_value - *cpu->data_bus - (~cpu->status & STATUS_CF));
     cpu->status &= ~(STATUS_VF | STATUS_CF);
-    if(new_value <= 0xFF) {
-      // Substraction has negated carry (borrow)
+    if(!(new_value & 0xFF00)) {
+      // MCS65XX manual: CF is set when the result is greater or equal to 0
       cpu->status |= STATUS_CF;
     }
   }
@@ -302,7 +305,7 @@ void do_CMP(M6502* cpu, uint8_t A, uint8_t B) {
   uint16_t comp = A - B;
   update_flags_register(cpu, (uint8_t)comp);
   cpu->status &= ~STATUS_CF;
-  if(comp > 0xFF) {
+  if(!(comp & 0xFF00)) {
     cpu->status |= STATUS_CF;
   }
 }
@@ -427,7 +430,6 @@ int load_dump(const char* path, uint8_t* data, size_t data_size) {
   close(fd);
   return SUCCESS;
 }
-
 
 int save_state(M6502* cpu) {
   // Dump registers, external pins and buses

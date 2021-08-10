@@ -24,6 +24,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define DDR_FLAG 0x04
+
 // very limited implementation only for the Apple I, not cycle accurate and I don't care
 
 typedef struct {
@@ -35,6 +37,8 @@ typedef struct {
   uint16_t PB_ADDR;  // high bit, yes, here, means DA is high, when printf finishes, drive it low. This is a char written by CPU
   uint16_t CRA_ADDR; // high bit means char available
   uint16_t CRB_ADDR; // just for show
+  uint8_t DDRA; // ignored
+  uint8_t DDRB; // ignored as well
   bool* RES;
   uint8_t* data_bus;
   uint16_t* addr_bus;
