@@ -690,7 +690,7 @@ void op_4A(M6502* cpu) {
 
 // JMP abs
 void op_4C(M6502* cpu) {
-switch(cpu->IR & 0x3) {
+switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
     break;
@@ -951,7 +951,7 @@ void op_6A(M6502* cpu) {
 
 // JMP ind
 void op_6C(M6502* cpu) {
-  switch(cpu->IR & 0x3) {
+  switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
     break;
