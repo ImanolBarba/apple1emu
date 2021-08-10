@@ -25,6 +25,7 @@
 #include <stdbool.h>
 
 #define DDR_FLAG 0x04
+#define MAX_COLUMNS 40
 
 // very limited implementation only for the Apple I, not cycle accurate and I don't care
 
