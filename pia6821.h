@@ -40,9 +40,9 @@ typedef struct {
   uint16_t CRB_ADDR; // just for show
   uint8_t DDRA; // ignored
   uint8_t DDRB; // ignored as well
-  bool* RES;
-  uint8_t* data_bus;
-  uint16_t* addr_bus;
+  volatile bool* RES;
+  volatile uint8_t* data_bus;
+  volatile uint16_t* addr_bus;
   bool* RW;
 } PIA6821;
 

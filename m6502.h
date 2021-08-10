@@ -53,7 +53,7 @@ typedef struct {
   unsigned long long int tick_count;
 
   // To signal that the CPU has stopped
-  bool* stop;
+  volatile bool* stop;
 
   // Internal registers - for internal use only
   // IR not only tracks the current opcode, but at what stage of the opcode we
@@ -65,13 +65,13 @@ typedef struct {
   uint16_t AD;
 
   // External lines (RW)
-  uint16_t* addr_bus;
-  uint8_t* data_bus;
-  bool *IRQ;
-  bool *NMI;
-  bool *RES;
-  bool *RDY;
-  bool *SO;
+  volatile uint16_t* addr_bus;
+  volatile uint8_t* data_bus;
+  volatile bool *IRQ;
+  volatile bool *NMI;
+  volatile bool *RES;
+  volatile bool *RDY;
+  volatile bool *SO;
 
   // External lines (RDONLY)
   bool RW;

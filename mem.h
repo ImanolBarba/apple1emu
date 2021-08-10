@@ -29,8 +29,8 @@ typedef struct {
   uint16_t start_addr;
   uint16_t end_addr;
   uint8_t* mem;
-  uint16_t* addr_bus;
-  uint8_t* data_bus;
+  volatile uint16_t* addr_bus;
+  volatile uint8_t* data_bus;
   bool* RW;
 } Mem_16;
 

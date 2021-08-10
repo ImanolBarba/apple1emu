@@ -33,10 +33,10 @@
 // TODO: reset triggered by user
 // TODO: debugger
 
-uint16_t address_bus;
-uint8_t data_bus;
-bool reset_line;
-bool poweroff = false;
+volatile uint16_t address_bus;
+volatile uint8_t data_bus;
+volatile bool reset_line;
+volatile bool poweroff = false;
 
 M6502 cpu;
 Connected_chip cpu_callback = {
@@ -158,7 +158,7 @@ int boot_apple1(unsigned int perf_counter_freq) {
   init_cpu(&cpu);
   pthread_t clock_thread;
   pthread_t input_thread;
-  if(pthread_create(&input_thread, NULL, input_run, &poweroff)) {
+  if(pthread_create(&input_thread, NULL, input_run, (void*)&poweroff)) {
     fprintf(stderr, "Error creating thread\n");
     return ERROR_PTHREAD_CREATE;
   }

@@ -71,7 +71,7 @@ char apple_to_ascii[0x100] = {
 // Linux has a 1024 buffer size for stdin (4096 if not reading from a tty), so
 // we really don't need to implement a buffer here
 char pressed_key;
-bool data_ready = false;
+volatile bool data_ready = false;
 
 unsigned int current_col = 0;
 
@@ -152,7 +152,7 @@ void clock_pia(void* ptr, bool status) {
 }
 
 void *input_run(void* ptr) {
-  bool* stop = (bool*)ptr;
+  volatile bool* stop = (bool*)ptr;
   while(!(*stop)) {
     if(data_ready) {
       // Don't read until the CPU has consumed the previous one
