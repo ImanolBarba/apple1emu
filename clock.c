@@ -53,14 +53,14 @@ void *clock_run(void* ptr) {
 }
 
 void tick(Clock* c) {
-  for(int i = 0; i < c->num_chips; ++i) {
+  for(unsigned int i = 0; i < c->num_chips; ++i) {
     Connected_chip* chip = c->clock_bus[i];
     (*chip->callback)(chip->chip, 1);
   }
 }
 
 void tock(Clock* c) {
-  for(int i = 0; i < c->num_chips; ++i) {
+  for(unsigned int i = 0; i < c->num_chips; ++i) {
     Connected_chip* chip = c->clock_bus[i];
     (*chip->callback)(chip->chip, 0);
   }

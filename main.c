@@ -59,7 +59,7 @@ void print_help(const char* argv) {
   printf("Just a simple Apple I emulator.\n\n");
 }
 
-size_t load_file(const char* path, uint8_t** dest) {
+int load_file(const char* path, uint8_t** dest) {
   struct stat st;
   stat(path, &st);
   size_t file_size = st.st_size;
@@ -76,7 +76,7 @@ size_t load_file(const char* path, uint8_t** dest) {
   }
   ssize_t num_read = 0;
   size_t data_pos = 0;
-  while(num_read != file_size) {
+  while(num_read != (ssize_t)file_size) {
     num_read = read(fd, data + data_pos, file_size);
     if(num_read == -1) {
       if(errno != EINTR) {
@@ -102,9 +102,9 @@ int main(int argc, char** argv) {
   size_t user_memory_size = 0xB000;
 
   uint8_t* rom_data = NULL;
-  size_t rom_length = 0;
+  int rom_length = 0;
   uint8_t* extra_data = NULL;
-  size_t extra_length = 0;
+  int extra_length = 0;
 
   unsigned int perf_counter_frequency = DEFAULT_PERF_COUNTER_FREQ;
 
