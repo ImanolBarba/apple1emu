@@ -105,7 +105,12 @@ int init_apple1(size_t user_ram_size, uint8_t* rom_data, size_t rom_length, uint
   extra_ram.addr_bus = &address_bus;
   extra_ram.data_bus = &data_bus;
   extra_ram.RW = &(cpu.RW);
-  load_data(&extra_ram, extra_data, extra_length, START_EXTRA_RAM);
+  if(extra_data != NULL) {
+    load_data(&extra_ram, extra_data, extra_length, START_EXTRA_RAM);
+    if(ret != SUCCESS) {
+      return FAILURE;
+    }
+  }
 
   ret = init_mem(&rom, START_ROM, END_ROM);
   if(ret != SUCCESS) {
@@ -115,6 +120,9 @@ int init_apple1(size_t user_ram_size, uint8_t* rom_data, size_t rom_length, uint
   rom.data_bus = &data_bus;
   rom.RW = &read_only;
   load_data(&rom, rom_data, rom_length, START_ROM);
+  if(ret != SUCCESS) {
+    return FAILURE;
+  }
 
   // Connect CPU
   cpu.addr_bus = &address_bus;

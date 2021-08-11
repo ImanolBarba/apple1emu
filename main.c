@@ -43,7 +43,7 @@ static struct option long_options[] = {
   {NULL, 0, NULL, 0}
 };
 
-void termination_handler (int signum) {
+void termination_handler(int signum) {
   if(signum == SIGINT) {
     halt_apple1();
   }
@@ -157,14 +157,13 @@ int main(int argc, char** argv) {
     exit(FAILURE);
   }
 
-  if(extra_path == NULL) {
-    fprintf(stderr, "Missing argument: -e\n");
-    exit(FAILURE);
+  if(extra_path != NULL) {
+    extra_length = load_file(extra_path, &extra_data);
+    if(extra_length < 0) {
+      exit(FAILURE);
+    }
   }
-  extra_length = load_file(extra_path, &extra_data);
-  if(extra_length < 0) {
-    exit(FAILURE);
-  }
+
 
   init_apple1(user_memory_size, rom_data, rom_length, extra_data, extra_length);
   int ret = boot_apple1(perf_counter_frequency);
