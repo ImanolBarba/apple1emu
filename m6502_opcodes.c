@@ -71,7 +71,7 @@ void op_00(M6502* cpu) {
       }
     break;
     case 3:
-      push_stack(cpu, cpu->status | STATUS_BF);
+      push_stack(cpu, cpu->status | STATUS_BF | STATUS_XF);
       if(cpu->break_status & BRK_RST) {
         // Write only enabled in non-RST interrupt, so set it to read again
         cpu->RW = true;

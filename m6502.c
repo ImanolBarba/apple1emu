@@ -42,8 +42,8 @@ void get_arg_indirect_index(M6502* cpu) {
     break;
     case 3:
       cpu->AD |= *cpu->data_bus << 8; // full addr
-      *cpu->addr_bus = (cpu->AD & 0xFF00) | ((cpu->AD + cpu->Y) & 0x00FF);
-      if(((cpu->AD & 0x00FF) + cpu->Y <= 0xFF) && !is_write_opcode(cpu->IR >> 3)) {
+      *cpu->addr_bus = (cpu->AD & 0xFF00) | (cpu->AD + cpu->Y);
+      if(((cpu->AD + cpu->Y) <= 0xFF) && !is_write_opcode(cpu->IR >> 3)) {
         // if we're on the same page already, 1 less cycle
         cpu->IR++;
       }
@@ -124,7 +124,7 @@ void get_arg_absolute_index(M6502* cpu, uint8_t index) {
     case 2:
       cpu->AD |= *cpu->data_bus << 8;
       *cpu->addr_bus = (cpu->AD & 0xFF00) | ((cpu->AD + index) & 0x00FF);
-      if(((cpu->AD & 0x00FF) + index <= 0xFF) && !is_write_opcode(cpu->IR >> 3)) {
+      if(!(((cpu->AD & 0x00FF) + index) & 0xFF00) && !is_write_opcode(cpu->IR >> 3)) {
         // Opcodes that write to the data bus while using this addressing always
         // take 1 extra cycle irregardless of whether or not the destination is
         // in the same page, so in that case, skip this skip.
@@ -217,15 +217,18 @@ void do_ADC(M6502* cpu) {
     // times it x10, then add the second one. This means that 0x8C in decimal
     // mode is in fact 92 (0x8 * 10 + 0xC).
     uint8_t lo_sum = (prev_value & 0x0F) + (*cpu->data_bus & 0x0F) + (cpu->status & STATUS_CF);
-    uint8_t hi_sum = ((prev_value & 0xF0) + (*cpu->data_bus & 0xF0)) >> 4;
-    uint8_t lo_digit = lo_sum % 10;
-    uint8_t hi_digit = hi_sum % 10 + lo_sum / 10;
+    uint8_t hi_sum = (((prev_value & 0xF0) + (*cpu->data_bus & 0xF0)) >> 4);
     cpu->status &= ~(STATUS_VF | STATUS_CF);
-    if(hi_digit/10) {
-      cpu->status |= STATUS_CF;
-      hi_digit = (hi_digit/10) - 1;
+    if(lo_sum > 9) {
+      lo_sum += 6;
+      hi_sum++;
     }
-    new_value = (uint16_t)(lo_digit|(hi_digit << 4));
+    if(hi_sum > 9) {
+      hi_sum += 6;
+      cpu->status |= STATUS_CF;
+    }
+
+    new_value = (uint16_t)((lo_sum & 0x0F)|((hi_sum & 0x0F) << 4));
   } else {
     // Normal
     new_value = (prev_value + *cpu->data_bus + (cpu->status & STATUS_CF));
@@ -253,17 +256,19 @@ void do_SBC(M6502* cpu) {
   uint16_t new_value = 0;
   if(cpu->status & STATUS_DF) {
     // Decimal mode
-    int8_t lo_digit = (prev_value & 0x0F) - (*cpu->data_bus & 0x0F) - ~(cpu->status & STATUS_CF);
-    uint8_t hi_digit = ((prev_value & 0xF0) - (*cpu->data_bus & 0xF0)) >> 4;
+    int8_t lo_digit = (prev_value & 0x0F) - (*cpu->data_bus & 0x0F) - (~cpu->status & STATUS_CF);
+    int8_t hi_digit = ((prev_value & 0xF0) - (*cpu->data_bus & 0xF0)) >> 4;
+    cpu->status &= ~STATUS_CF;
     if(lo_digit < 0) {
       lo_digit += 10;
       hi_digit--;
     }
     if(hi_digit < 0) {
       hi_digit += 10;
-      // We don't set CF because BCD is unsigned
+    } else {
+      cpu->status |= STATUS_CF;
     }
-    new_value = (uint16_t)(lo_digit|(hi_digit << 4));
+    new_value = (uint16_t)((lo_digit & 0x0F)|((hi_digit & 0x0F) << 4));
   } else {
     // Normal
     //
@@ -274,7 +279,7 @@ void do_SBC(M6502* cpu) {
     // will normally be no borrow; therefore, the programmer must set the carry
     // flag, by using the SEC (Set carry to 1) instruction, before using the SBC
     // instruction
-    new_value = (prev_value - *cpu->data_bus - (~cpu->status & STATUS_CF));
+    new_value = ((prev_value - *cpu->data_bus) - (~cpu->status & STATUS_CF));
     cpu->status &= ~(STATUS_VF | STATUS_CF);
     if(!(new_value & 0xFF00)) {
       // MCS65XX manual: CF is set when the result is greater or equal to 0
@@ -298,7 +303,7 @@ void do_SBC(M6502* cpu) {
 
 void do_LD_(M6502* cpu, int8_t* reg) {
   *reg = (uint8_t)*cpu->data_bus;
-  update_flags_register(cpu, *reg);
+  update_flags_register(cpu, (uint8_t)*reg);
 }
 
 void do_CMP(M6502* cpu, uint8_t A, uint8_t B) {
@@ -341,7 +346,7 @@ uint8_t do_LSR(M6502* cpu, uint8_t x) {
 }
 
 uint8_t do_ROR(M6502* cpu, uint8_t x) {
-  uint8_t res = (x >> 1) | ((cpu->status & STATUS_CF) << 8);
+  uint8_t res = (x >> 1) | ((cpu->status & STATUS_CF) << 7);
   cpu->status &= ~STATUS_CF;
   if(x & 0x01) {
     cpu->status |= STATUS_CF;
