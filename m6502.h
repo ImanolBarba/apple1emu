@@ -97,9 +97,9 @@ typedef struct {
 } M6502;
 
 struct M6502_Registers {
-  int8_t A;
-  int8_t X;
-  int8_t Y;
+  uint8_t A;
+  uint8_t X;
+  uint8_t Y;
   uint16_t PC;
   uint8_t S;
   uint8_t status;

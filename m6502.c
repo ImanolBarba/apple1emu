@@ -123,7 +123,7 @@ void get_arg_absolute_index(M6502* cpu, uint8_t index) {
     break;
     case 2:
       cpu->AD |= *cpu->data_bus << 8;
-      *cpu->addr_bus = (cpu->AD & 0xFF00) | ((cpu->AD + index) & 0x00FF);
+      *cpu->addr_bus = cpu->AD + index;
       if(!(((cpu->AD & 0x00FF) + index) & 0xFF00) && !is_write_opcode(cpu->IR >> 3)) {
         // Opcodes that write to the data bus while using this addressing always
         // take 1 extra cycle irregardless of whether or not the destination is
