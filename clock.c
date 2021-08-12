@@ -25,6 +25,7 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <time.h>
+#include <sys/time.h>
 
 void init_clock(Clock* c, unsigned int freq) {
   c->freq = freq;
@@ -42,11 +43,22 @@ int clock_connect(Clock* c, Connected_chip* chip) {
 
 void *clock_run(void* ptr) {
   Clock* c = (Clock*)ptr;
+  unsigned short tick_count = 0;
+  struct timespec begin={0,0};
+  struct timespec end={0,0};
+  struct timespec delta={0,0};
+  clock_gettime(CLOCK_TAI, &begin);
   while(!(*c->stop)) {
-    // TODO: Right now, things run at full speed. Can I find a way to limit cpu
-    // usage to reproduce the original 1MHz clock speed?
     tick(c);
     tock(c);
+    if((++tick_count == TICKS_FOR_SYNC)) {
+      clock_gettime(CLOCK_TAI, &end);
+      delta.tv_nsec = (1e9/c->freq)*TICKS_FOR_SYNC - (end.tv_nsec - begin.tv_nsec);
+      //fprintf(stderr, "Did %d ticks in %d ns, sleeping %d ns\n", TICKS_FOR_SYNC,(end.tv_nsec - begin.tv_nsec),delta.tv_nsec);
+      nanosleep(&delta, NULL);
+      clock_gettime(CLOCK_TAI, &begin);
+      tick_count = 0;
+    }
   }
   fprintf(stderr, "Stopping clock thread...\n");
   pthread_exit(0);

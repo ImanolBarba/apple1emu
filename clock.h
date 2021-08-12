@@ -25,6 +25,7 @@
 #include <pthread.h>
 
 #define MAX_CHIPS_ON_BUS 0xFF
+#define TICKS_FOR_SYNC 2000
 
 typedef void (*clock_callback)(void*, bool);
 typedef struct {
