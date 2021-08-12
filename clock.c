@@ -47,16 +47,15 @@ void *clock_run(void* ptr) {
   struct timespec begin={0,0};
   struct timespec end={0,0};
   struct timespec delta={0,0};
-  clock_gettime(CLOCK_TAI, &begin);
+  clock_gettime(CLOCK_MONOTONIC, &begin);
   while(!(*c->stop)) {
     tick(c);
     tock(c);
     if((++tick_count == TICKS_FOR_SYNC)) {
-      clock_gettime(CLOCK_TAI, &end);
-      delta.tv_nsec = (1e9/c->freq)*TICKS_FOR_SYNC - (end.tv_nsec - begin.tv_nsec);
-      //fprintf(stderr, "Did %d ticks in %d ns, sleeping %d ns\n", TICKS_FOR_SYNC,(end.tv_nsec - begin.tv_nsec),delta.tv_nsec);
+      clock_gettime(CLOCK_MONOTONIC, &end);
+      delta.tv_nsec = (1e9/c->freq)*TICKS_FOR_SYNC - (end.tv_nsec - begin.tv_nsec) - c->clock_adjust;
       nanosleep(&delta, NULL);
-      clock_gettime(CLOCK_TAI, &begin);
+      clock_gettime(CLOCK_MONOTONIC, &begin);
       tick_count = 0;
     }
   }

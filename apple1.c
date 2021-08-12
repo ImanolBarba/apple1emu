@@ -161,7 +161,7 @@ int init_apple1(size_t user_ram_size, uint8_t* rom_data, size_t rom_length, uint
   return SUCCESS;
 }
 
-int boot_apple1(unsigned int perf_counter_freq) {
+int boot_apple1() {
   init_pia();
   init_cpu(&cpu);
   pthread_t clock_thread;
@@ -176,16 +176,17 @@ int boot_apple1(unsigned int perf_counter_freq) {
   }
 
   unsigned long long int perf_counter = 0;
-  if(!perf_counter_freq) {
-    while(!poweroff) {
-      sleep(1);
+  while(!poweroff) {
+    // Main control loop
+    // TODO: Now we print every second, but in the future, we'll make it so the speed is printed if the user presses a certain key instead
+    sleep(1);
+    float emulation_speed = (float)(cpu.tick_count/++perf_counter);
+    if(emulation_speed > CLOCK_SPEED) {
+      main_clock.clock_adjust -= CLOCK_ADJUST_GRANULARITY;
+    } else if(emulation_speed < CLOCK_SPEED) {
+      main_clock.clock_adjust += CLOCK_ADJUST_GRANULARITY;
     }
-  } else {
-    while(!poweroff) {
-      // Main control loop
-      sleep(perf_counter_freq);
-      fprintf(stderr, "cycles per second: %.2f\n", (float)(cpu.tick_count/(perf_counter_freq*(++perf_counter))));
-    }
+    fprintf(stderr, "cycles per second: %.2f\n", emulation_speed);
   }
   // Send SIGINT to the input thread so that the read syscall gets interrupted
   if(pthread_kill(input_thread, SIGINT)) {

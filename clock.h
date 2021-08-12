@@ -25,7 +25,8 @@
 #include <pthread.h>
 
 #define MAX_CHIPS_ON_BUS 0xFF
-#define TICKS_FOR_SYNC 2000
+#define TICKS_FOR_SYNC 1000
+#define CLOCK_ADJUST_GRANULARITY 1e5
 
 typedef void (*clock_callback)(void*, bool);
 typedef struct {
@@ -38,6 +39,7 @@ typedef struct {
   Connected_chip* clock_bus[MAX_CHIPS_ON_BUS];
   unsigned int num_chips;
   volatile bool* stop;
+  long int clock_adjust;
 } Clock;
 
 void init_clock(Clock* c, unsigned int freq);

@@ -40,7 +40,7 @@
 
 
 int init_apple1(size_t user_ram_size, uint8_t* rom_data, size_t rom_length, uint8_t* extra_data, size_t extra_length);
-int boot_apple1(unsigned int perf_counter_freq);
+int boot_apple1();
 void halt_apple1();
 
 #endif

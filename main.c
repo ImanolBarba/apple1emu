@@ -55,7 +55,7 @@ void print_version(const char* argv) {
 
 void print_help(const char* argv) {
   print_version(argv);
-  printf("%s [-r --rom ROM_PATH] [-e --extra EXTRA_RAM_PATH] [-m --mem USER_MEMORY_SIZE] [-p --perf-counter PERF_COUNTER_FREQ] [-h --help]\n", argv);
+  printf("%s [-r --rom ROM_PATH] [-e --extra EXTRA_RAM_PATH] [-m --mem USER_MEMORY_SIZE] [-h --help]\n", argv);
   printf("Just a simple Apple I emulator.\n\n");
 }
 
@@ -106,8 +106,6 @@ int main(int argc, char** argv) {
   uint8_t* extra_data = NULL;
   int extra_length = 0;
 
-  unsigned int perf_counter_frequency = DEFAULT_PERF_COUNTER_FREQ;
-
   struct sigaction act;
   memset(&act, 0, sizeof(act));
 
@@ -122,7 +120,7 @@ int main(int argc, char** argv) {
 
   int c;
   int option_index;
-  while ((c = getopt_long(argc, argv, "hm:e:r:p:", long_options, &option_index)) != -1) {
+  while ((c = getopt_long(argc, argv, "hm:e:r:", long_options, &option_index)) != -1) {
     switch (c) {
       case 'm':
         user_memory_size = atoi(optarg);
@@ -132,9 +130,6 @@ int main(int argc, char** argv) {
       break;
       case 'r':
         rom_path = optarg;
-      break;
-      case 'p':
-        perf_counter_frequency = atoi(optarg);
       break;
       case 'h':
       case '?':
@@ -166,7 +161,7 @@ int main(int argc, char** argv) {
 
 
   init_apple1(user_memory_size, rom_data, rom_length, extra_data, extra_length);
-  int ret = boot_apple1(perf_counter_frequency);
+  int ret = boot_apple1();
   if(ret != SUCCESS) {
     exit(FAILURE);
   }
