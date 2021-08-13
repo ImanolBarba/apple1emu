@@ -179,6 +179,9 @@ int init_apple1_binary(uint8_t* binary_data, size_t binary_length, uint16_t star
     return FAILURE;
   }
 
+  user_ram.mem[0xFFFC] = start_addr & 0x00FF;
+  user_ram.mem[0xFFFD] = (start_addr & 0xFF00) >> 8;
+
   // Connect CPU
   cpu.addr_bus = &address_bus;
   cpu.data_bus = &data_bus;
