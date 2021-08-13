@@ -236,6 +236,7 @@ void process_emulator_input(char key) {
     break;
     case EMULATOR_TURBO:
       main_clock.turbo = !main_clock.turbo;
+      fprintf(stderr, "Turbo mode: %s\n", main_clock.turbo ? "ON" : "OFF");
     break;
   }
 }
