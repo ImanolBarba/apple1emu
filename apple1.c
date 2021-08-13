@@ -30,7 +30,6 @@
 #include <pthread.h>
 #include <signal.h>
 
-// TODO: reset triggered by user
 // TODO: debugger
 
 float emulation_speed = 0.0;
@@ -169,7 +168,8 @@ void process_emulator_input(char key) {
       //nothing
     break;
     case EMULATOR_RESET:
-      //nothing
+      reset_line = false;
+      clear_screen();
     break;
     case EMULATOR_BREAK:
       //nothing

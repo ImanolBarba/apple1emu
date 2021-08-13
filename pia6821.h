@@ -66,5 +66,6 @@ typedef struct {
 void clock_pia(void* ptr, bool status);
 void init_pia();
 void *input_run(void* ptr);
+void clear_screen();
 
 #endif
