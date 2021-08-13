@@ -207,6 +207,13 @@ char read_escape_sequence() {
   return UNKNOWN_SEQUENCE;
 }
 
+void clear_screen() {
+  // Clear screen
+  write(STDOUT_FILENO, "\x1b[2J", 4);
+  // Move cursor to top
+  write(STDOUT_FILENO, "\x1b[1;1H", 6);
+}
+
 void *input_run(void* ptr) {
   volatile bool* stop = (bool*)ptr;
   char special_input;
@@ -224,8 +231,7 @@ void *input_run(void* ptr) {
     } else if(bytes_read == 1) {
       switch(pressed_key) {
         case TILDE_KEY:
-          // Clear screen
-          write(STDOUT_FILENO, "\x1b[2J", 4);
+          clear_screen();
           continue;
         break;
         case ESC_KEY:
@@ -254,4 +260,5 @@ void init_pia() {
   struct termios raw = orig_termios;
   raw.c_lflag &= ~(ECHO | ICANON);
   tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+  clear_screen();
 }
