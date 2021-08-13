@@ -27,6 +27,23 @@
 #define DDR_FLAG 0x04
 #define MAX_COLUMNS 40
 
+#define ESC_KEY 0x1B
+#define TILDE_KEY 0x60
+
+enum emulator_input {
+  NO_SEQUENCE = 0,
+  UNKNOWN_SEQUENCE = 1,
+  EMULATOR_CONTINUE = 2,
+  EMULATOR_RESET = 3,
+  EMULATOR_BREAK = 4,
+  EMULATOR_STEP_INSTRUCTION = 5,
+  EMULATOR_STEP_CLOCK = 6,
+  EMULATOR_PRINT_CYCLES = 7,
+  EMULATOR_SAVE_STATE = 8,
+  EMULATOR_LOAD_STATE = 9
+};
+
+
 // very limited implementation only for the Apple I, not cycle accurate and I don't care
 
 typedef struct {

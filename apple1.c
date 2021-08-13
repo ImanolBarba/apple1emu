@@ -33,6 +33,8 @@
 // TODO: reset triggered by user
 // TODO: debugger
 
+float emulation_speed = 0.0;
+
 volatile uint16_t address_bus;
 volatile uint8_t data_bus;
 volatile bool reset_line;
@@ -161,6 +163,35 @@ int init_apple1(size_t user_ram_size, uint8_t* rom_data, size_t rom_length, uint
   return SUCCESS;
 }
 
+void process_emulator_input(char key) {
+  switch(key) {
+    case EMULATOR_CONTINUE:
+      //nothing
+    break;
+    case EMULATOR_RESET:
+      //nothing
+    break;
+    case EMULATOR_BREAK:
+      //nothing
+    break;
+    case EMULATOR_STEP_INSTRUCTION:
+      //nothing
+    break;
+    case EMULATOR_STEP_CLOCK:
+      //nothing
+    break;
+    case EMULATOR_PRINT_CYCLES:
+      fprintf(stderr, "cycles per second: %.2f\n", emulation_speed);
+    break;
+    case EMULATOR_SAVE_STATE:
+      save_state(&cpu);
+    break;
+    case EMULATOR_LOAD_STATE:
+      load_state(&cpu);
+    break;
+  }
+}
+
 int boot_apple1() {
   init_pia();
   init_cpu(&cpu);
@@ -178,15 +209,13 @@ int boot_apple1() {
   unsigned long long int perf_counter = 0;
   while(!poweroff) {
     // Main control loop
-    // TODO: Now we print every second, but in the future, we'll make it so the speed is printed if the user presses a certain key instead
     sleep(1);
-    float emulation_speed = (float)(cpu.tick_count/++perf_counter);
+    emulation_speed = (float)(cpu.tick_count/++perf_counter);
     if(emulation_speed > CLOCK_SPEED) {
       main_clock.clock_adjust -= CLOCK_ADJUST_GRANULARITY;
     } else if(emulation_speed < CLOCK_SPEED) {
       main_clock.clock_adjust += CLOCK_ADJUST_GRANULARITY;
     }
-    fprintf(stderr, "cycles per second: %.2f\n", emulation_speed);
   }
   // Send SIGINT to the input thread so that the read syscall gets interrupted
   if(pthread_kill(input_thread, SIGINT)) {

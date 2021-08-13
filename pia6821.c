@@ -19,6 +19,7 @@
  ***************************************************************************/
 
 #include "pia6821.h"
+#include "apple1.h"
 
 #include <termios.h>
 #include <unistd.h>
@@ -27,6 +28,8 @@
 #include <stdio.h>
 #include <errno.h>
 #include <pthread.h>
+#include <sys/ioctl.h>
+#include <string.h>
 
 struct termios orig_termios;
 
@@ -151,19 +154,88 @@ void clock_pia(void* ptr, bool status) {
   }
 }
 
+// return 0 if there are no more pending bytes - i.e: the user only pressed ESC
+char read_escape_sequence() {
+  char sequence_buffer[16];
+  size_t buffer_pos = 0;
+  memset(sequence_buffer, 0x00, sizeof(sequence_buffer));
+  unsigned int pending_bytes = 0;
+  while(ioctl(STDIN_FILENO, FIONREAD, &pending_bytes) == 0 && pending_bytes > 0) {
+    if(read(STDIN_FILENO, sequence_buffer + buffer_pos++, 1) == -1) {
+      if(errno == EINTR) {
+        buffer_pos--;
+        continue;
+      }
+      fprintf(stderr, "Error reading from stdin\n");
+    }
+  }
+  if(*sequence_buffer == '\0') {
+    return NO_SEQUENCE;
+  }
+  // F5
+  if(!memcmp(sequence_buffer, "[15~", 5)) {
+    return EMULATOR_CONTINUE;
+  }
+  // F6
+  if(!memcmp(sequence_buffer, "[17~", 5)) {
+    return EMULATOR_SAVE_STATE;
+  }
+  // F7
+  if(!memcmp(sequence_buffer, "[18~", 5)) {
+    return EMULATOR_LOAD_STATE;
+  }
+  // F8
+  if(!memcmp(sequence_buffer, "[19~", 5)) {
+    return EMULATOR_RESET;
+  }
+  // F9
+  if(!memcmp(sequence_buffer, "[20~", 5)) {
+    return EMULATOR_BREAK;
+  }
+  // F10
+  if(!memcmp(sequence_buffer, "[21~", 5)) {
+    return EMULATOR_STEP_INSTRUCTION;
+  }
+  // F11
+  if(!memcmp(sequence_buffer, "[23~", 5)) {
+    return EMULATOR_STEP_CLOCK;
+  }
+  // F12
+  if(!memcmp(sequence_buffer, "[24~", 5)) {
+    return EMULATOR_PRINT_CYCLES;
+  }
+  return UNKNOWN_SEQUENCE;
+}
+
 void *input_run(void* ptr) {
   volatile bool* stop = (bool*)ptr;
+  char special_input;
   while(!(*stop)) {
     if(data_ready) {
       // Don't read until the CPU has consumed the previous one
       continue;
     }
-    if(read(STDIN_FILENO, &pressed_key, 1) != 1) {
+    ssize_t bytes_read = read(STDIN_FILENO, &pressed_key, 1);
+    if(bytes_read == -1) {
       if(errno == EINTR) {
         continue;
       }
       fprintf(stderr, "Error reading from stdin\n");
-    } else {
+    } else if(bytes_read == 1) {
+      switch(pressed_key) {
+        case TILDE_KEY:
+          // Clear screen
+          write(STDOUT_FILENO, "\x1b[2J", 4);
+          continue;
+        break;
+        case ESC_KEY:
+          special_input = read_escape_sequence();
+          if(special_input) {
+            process_emulator_input(special_input);
+            continue;
+          }
+        break;
+      }
       data_ready = true;
     }
   }

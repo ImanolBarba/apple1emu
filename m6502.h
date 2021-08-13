@@ -55,6 +55,12 @@ typedef struct {
   // To signal that the CPU has stopped
   volatile bool* stop;
 
+  // To ignore clock cycles;
+  volatile bool enabled;
+
+  // True when the CPU is actively processing a cycle
+  volatile bool active;
+
   // Internal registers - for internal use only
   // IR not only tracks the current opcode, but at what stage of the opcode we
   // are, by using the 2 lower bits, since the opcode is shifted 3 bits to the right
@@ -78,9 +84,9 @@ typedef struct {
   bool SYNC;
 
   // Internal registers - for programmer
-  int8_t A;
-  int8_t X;
-  int8_t Y;
+  uint8_t A;
+  uint8_t X;
+  uint8_t Y;
   uint16_t PC;
   uint8_t S;
   uint8_t status;
@@ -96,7 +102,8 @@ typedef struct {
   Clock phi2;
 } M6502;
 
-struct M6502_Registers {
+struct M6502_State {
+  unsigned long long int tick_count;
   uint8_t A;
   uint8_t X;
   uint8_t Y;
@@ -105,11 +112,15 @@ struct M6502_Registers {
   uint8_t status;
   uint8_t RW;
   uint8_t SYNC;
+  uint16_t IR;
+  uint8_t break_status;
+  uint16_t AD;
   uint16_t addr_bus;
   uint8_t data_bus;
+  uint8_t mem[MEMSIZE];
 } __attribute__((packed));
 
-typedef struct M6502_Registers M6502_Registers;
+typedef struct M6502_State M6502_State;
 
 void clock_cpu(void* ptr, bool status);
 void init_cpu(M6502* cpu);
@@ -133,7 +144,7 @@ void do_EOR(M6502* cpu);
 void do_ADC(M6502* cpu);
 void do_SBC(M6502* cpu);
 void do_BIT(M6502* cpu);
-void do_LD_(M6502* cpu, int8_t* reg);
+void do_LD_(M6502* cpu, uint8_t* reg);
 void do_CMP(M6502* cpu, uint8_t A, uint8_t B);
 uint8_t do_ROL(M6502* cpu, uint8_t x);
 uint8_t do_ASL(M6502* cpu, uint8_t x);

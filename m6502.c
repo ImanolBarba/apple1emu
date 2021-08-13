@@ -301,7 +301,7 @@ void do_SBC(M6502* cpu) {
   update_flags_register(cpu, cpu->A);
 }
 
-void do_LD_(M6502* cpu, int8_t* reg) {
+void do_LD_(M6502* cpu, uint8_t* reg) {
   *reg = (uint8_t)*cpu->data_bus;
   update_flags_register(cpu, (uint8_t)*reg);
 }
@@ -438,34 +438,43 @@ int load_dump(const char* path, uint8_t* data, size_t data_size) {
 }
 
 int save_state(M6502* cpu) {
-  // Dump registers, external pins and buses
-  M6502_Registers regs;
-  regs.A = cpu->A;
-  regs.X = cpu->X;
-  regs.Y = cpu->Y;
-  regs.S = cpu->S;
-  regs.status = cpu->status;
-  regs.PC = cpu->PC;
-  regs.data_bus = *cpu->data_bus;
-  regs.addr_bus = *cpu->addr_bus;
-  regs.RW = cpu->RW ? 1 : 0;
-  regs.SYNC = cpu->SYNC ? 1 : 0;
-  if(dump_file("regs_dump", (uint8_t*)&regs, sizeof(regs)) != SUCCESS) {
-    return FAILURE;
+  cpu->enabled = false;
+  while(cpu->active) {
+    // spin
   }
-  fprintf(stderr, "Register status dumped to \"regs_dump\"\n");
+  // Dump registers, external pins and buses
+  M6502_State state;
+  state.A = cpu->A;
+  state.X = cpu->X;
+  state.Y = cpu->Y;
+  state.S = cpu->S;
+  state.status = cpu->status;
+  state.PC = cpu->PC;
+  state.data_bus = *cpu->data_bus;
+  state.addr_bus = *cpu->addr_bus;
+  state.RW = cpu->RW ? 1 : 0;
+  state.SYNC = cpu->SYNC ? 1 : 0;
+  state.tick_count = cpu->tick_count;
+  state.IR = cpu->IR;
+  state.break_status = cpu->break_status;
+  state.AD = cpu->AD;
 
-  uint8_t mem[MEMSIZE];
   for(unsigned int i = 0; i < MEMSIZE; ++i) {
     *cpu->addr_bus = i;
     clock_cpu((void*)cpu, true);
-    mem[i] = *cpu->data_bus;
+    state.mem[i] = *cpu->data_bus;
   }
-  if(dump_file("mem_dump", mem, MEMSIZE) != SUCCESS) {
+
+  // Restore altered pins
+  *cpu->addr_bus = state.addr_bus;
+  *cpu->data_bus = state.data_bus;
+
+  if(dump_file("savestate", (uint8_t*)&state, sizeof(state)) != SUCCESS) {
+    cpu->enabled = true;
     return FAILURE;
   }
-  fprintf(stderr, "Memory dumped to \"mem_dump\"\n");
-
+  fprintf(stderr, "State dumped to \"savestate\"\n");
+  cpu->enabled = true;
   return SUCCESS;
 }
 
@@ -473,35 +482,44 @@ int load_state(M6502* cpu) {
   // Load the stuff back. We have to guarantee that if something fails, the
   // current state won't change
 
-  M6502_Registers regs;
-  uint8_t mem[MEMSIZE];
+  cpu->enabled = false;
 
-  if(load_dump("regs_dump", (uint8_t*)&regs, sizeof(regs)) != SUCCESS) {
+  M6502_State state;
+
+  if(load_dump("savestate", (uint8_t*)&state, sizeof(state)) != SUCCESS) {
+    cpu->enabled = true;
     return FAILURE;
   }
-  if(load_dump("mem_dump", mem, MEMSIZE) != SUCCESS) {
-    return FAILURE;
+
+  while(cpu->active) {
+    // spin
   }
 
-  regs.A = cpu->A;
-  regs.X = cpu->X;
-  regs.Y = cpu->Y;
-  regs.S = cpu->S;
-  regs.status = cpu->status;
-  regs.PC = cpu->PC;
-  regs.data_bus = *cpu->data_bus;
-  regs.addr_bus = *cpu->addr_bus;
-  regs.RW = cpu->RW ? 1 : 0;
-  regs.SYNC = cpu->SYNC ? 1 : 0;
-  fprintf(stderr, "Loaded registers\n");
-
+  cpu->RW = false;
   for(unsigned int i = 0; i < MEMSIZE; ++i) {
     *cpu->addr_bus = i;
+    *cpu->data_bus = state.mem[i];
     clock_cpu((void*)cpu, true);
-    mem[i] = *cpu->data_bus;
   }
   fprintf(stderr, "Loaded memory\n");
 
+  cpu->A = state.A;
+  cpu->X = state.X;
+  cpu->Y = state.Y;
+  cpu->S = state.S;
+  cpu->status = state.status;
+  cpu->PC = state.PC;
+  *cpu->data_bus = state.data_bus;
+  *cpu->addr_bus = state.addr_bus;
+  cpu->RW = state.RW ? true : false;
+  cpu->SYNC = state.SYNC ? true : false;
+  cpu->tick_count = state.tick_count;
+  cpu->IR = state.IR;
+  cpu->break_status = state.break_status;
+  cpu->AD = state.AD;
+  fprintf(stderr, "Loaded registers\n");
+
+  cpu->enabled = true;
   return SUCCESS;
 }
 
@@ -536,13 +554,15 @@ void init_cpu(M6502* cpu) {
   *cpu->RES = false;
   cpu->RW = true;
   cpu->SYNC = true;
+  cpu->enabled = true;
 }
 
 void cpu_cycle(M6502* cpu) {
-  if(*cpu->stop) {
-    // CPU is disabled
+  if(*cpu->stop || !cpu->enabled) {
+    // CPU is disabled or stopped
     return;
   }
+  cpu->active = true;
   cpu->tick_count++;
 
   if(!*cpu->RES) {
@@ -578,4 +598,5 @@ void cpu_cycle(M6502* cpu) {
   cpu->RW = true;
   run_opcode(cpu);
   cpu->IR++;
+  cpu->active = false;
 }
