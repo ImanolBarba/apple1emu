@@ -231,6 +231,9 @@ void process_emulator_input(char key) {
     case EMULATOR_LOAD_STATE:
       load_state(&cpu);
     break;
+    case EMULATOR_TURBO:
+      main_clock.turbo = !main_clock.turbo;
+    break;
   }
 }
 
@@ -242,7 +245,7 @@ void print_greeting() {
   printf(" \\__,_| .__/| .__/|_|\\___| |_|  \\___|_| |_| |_|\\__,_|\n");
   printf("      |_|   |_|                                      \n");
   printf("\n");
-  printf("`: Clear screen\n");
+  printf("`: Clear screen                         TAB: Toggle turbo mode\n");
   printf("F5: Resume execution (From debugger)    F9: Break to debugger\n");
   printf("F6: Save state                          F10: Step instruction\n");
   printf("F7: Load state                          F11: Step clock cycle\n");
@@ -265,15 +268,17 @@ int boot_apple1() {
     return ERROR_PTHREAD_CREATE;
   }
 
-  unsigned long long int perf_counter = 0;
   while(!poweroff) {
     // Main control loop
+    unsigned int start_ticks = cpu.tick_count;
     sleep(1);
-    emulation_speed = (float)(cpu.tick_count/++perf_counter);
-    if(emulation_speed > CLOCK_SPEED) {
-      main_clock.clock_adjust -= CLOCK_ADJUST_GRANULARITY;
-    } else if(emulation_speed < CLOCK_SPEED) {
-      main_clock.clock_adjust += CLOCK_ADJUST_GRANULARITY;
+    emulation_speed = (float)((cpu.tick_count - start_ticks));
+    if(!main_clock.turbo) {
+      if(emulation_speed > CLOCK_SPEED) {
+        main_clock.clock_adjust -= CLOCK_ADJUST_GRANULARITY;
+      } else if(emulation_speed < CLOCK_SPEED) {
+        main_clock.clock_adjust += CLOCK_ADJUST_GRANULARITY;
+      }
     }
   }
   // Send SIGINT to the input thread so that the read syscall gets interrupted

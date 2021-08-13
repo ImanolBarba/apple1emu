@@ -31,6 +31,7 @@ void init_clock(Clock* c, unsigned int freq) {
   c->freq = freq;
   c->num_chips = 0;
   memset(c->clock_bus, 0, MAX_CHIPS_ON_BUS * sizeof(Connected_chip*));
+  c->turbo = false;
 }
 
 int clock_connect(Clock* c, Connected_chip* chip) {
@@ -51,6 +52,9 @@ void *clock_run(void* ptr) {
   while(!(*c->stop)) {
     tick(c);
     tock(c);
+    if(c->turbo) {
+      continue;
+    }
     if((++tick_count == TICKS_FOR_SYNC)) {
       clock_gettime(CLOCK_MONOTONIC, &end);
       delta.tv_nsec = (1e9/c->freq)*TICKS_FOR_SYNC - (end.tv_nsec - begin.tv_nsec) - c->clock_adjust;

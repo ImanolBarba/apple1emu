@@ -40,6 +40,7 @@ typedef struct {
   unsigned int num_chips;
   volatile bool* stop;
   long int clock_adjust;
+  volatile bool turbo;
 } Clock;
 
 void init_clock(Clock* c, unsigned int freq);

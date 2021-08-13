@@ -29,6 +29,7 @@
 
 #define ESC_KEY 0x1B
 #define TILDE_KEY 0x60
+#define TAB_KEY 0x09
 
 enum emulator_input {
   NO_SEQUENCE = 0,
@@ -40,7 +41,8 @@ enum emulator_input {
   EMULATOR_STEP_CLOCK = 6,
   EMULATOR_PRINT_CYCLES = 7,
   EMULATOR_SAVE_STATE = 8,
-  EMULATOR_LOAD_STATE = 9
+  EMULATOR_LOAD_STATE = 9,
+  EMULATOR_TURBO = 10
 };
 
 
