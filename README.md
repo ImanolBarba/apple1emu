@@ -13,9 +13,8 @@ ROMs are not provided
 
 Usage
 --
-`./apple1emu -r <ROM_FILE> -e <EXTRA_FILE> -p X`
+`./apple1emu -r <ROM_FILE> -e <EXTRA_FILE>`
 
-- `EXTRA_FILE` is data to be loaded from `E000` to `EFFF`, normally the Apple Integer Basic program
-- -p X is the amount of seconds the emulator will print the number of cycles executed, just for a quick benchmark. -p 0 disables the spam entirely
+`EXTRA_FILE` is data to be loaded from `E000` to `EFFF`, normally the Apple Integer Basic program
 
 
