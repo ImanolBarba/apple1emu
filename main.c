@@ -39,7 +39,9 @@ static struct option long_options[] = {
   {"memory",  required_argument, NULL, 'm'},
   {"extra",  required_argument, NULL, 'e'},
   {"rom",  required_argument, NULL, 'r'},
-  {"perf-counter", required_argument, NULL, 'p'},
+  {"binary", required_argument, NULL, 'b'},
+  {"start-addr", required_argument, NULL, 'a'},
+  {"load-addr", required_argument, NULL, 'l'},
   {NULL, 0, NULL, 0}
 };
 
@@ -55,7 +57,7 @@ void print_version(const char* argv) {
 
 void print_help(const char* argv) {
   print_version(argv);
-  printf("%s [-r --rom ROM_PATH] [-e --extra EXTRA_RAM_PATH] [-m --mem USER_MEMORY_SIZE] [-h --help]\n", argv);
+  printf("%s [-r --rom ROM_PATH] [-e --extra EXTRA_RAM_PATH] [-m --mem USER_MEMORY_SIZE] [-b --binary PROGRAM] [-l --load-addr LOAD_ADDR] [-a --start-addr START_ADDR] [-h --help]\n", argv);
   printf("Just a simple Apple I emulator.\n\n");
 }
 
@@ -99,12 +101,18 @@ int load_file(const char* path, uint8_t** dest) {
 int main(int argc, char** argv) {
   char* rom_path = NULL;
   char* extra_path = NULL;
+  char* binary_path = NULL;
   size_t user_memory_size = 0xB000;
 
   uint8_t* rom_data = NULL;
   int rom_length = 0;
   uint8_t* extra_data = NULL;
   int extra_length = 0;
+  uint8_t* binary_data = NULL;
+  int binary_length = 0;
+
+  uint16_t start_addr = 0x0000;
+  uint16_t load_addr = 0x0000;
 
   struct sigaction act;
   memset(&act, 0, sizeof(act));
@@ -120,7 +128,7 @@ int main(int argc, char** argv) {
 
   int c;
   int option_index;
-  while ((c = getopt_long(argc, argv, "hm:e:r:", long_options, &option_index)) != -1) {
+  while ((c = getopt_long(argc, argv, "hm:e:r:b:a:l:", long_options, &option_index)) != -1) {
     switch (c) {
       case 'm':
         user_memory_size = atoi(optarg);
@@ -130,6 +138,15 @@ int main(int argc, char** argv) {
       break;
       case 'r':
         rom_path = optarg;
+      break;
+      case 'b':
+        binary_path = optarg;
+      break;
+      case 'a':
+        start_addr = atoi(optarg);
+      break;
+      case 'l':
+        load_addr = atoi(optarg);
       break;
       case 'h':
       case '?':
@@ -143,13 +160,16 @@ int main(int argc, char** argv) {
     }
   }
 
-  if(rom_path == NULL) {
-    fprintf(stderr, "Missing argument: -r\n");
+  if(rom_path == NULL && binary_path == NULL) {
+    fprintf(stderr, "Missing argument: need to specify -r or -b\n");
     exit(FAILURE);
   }
-  rom_length = load_file(rom_path, &rom_data);
-  if(rom_length < 0) {
-    exit(FAILURE);
+
+  if(rom_path != NULL) {
+    rom_length = load_file(rom_path, &rom_data);
+    if(rom_length < 0) {
+      exit(FAILURE);
+    }
   }
 
   if(extra_path != NULL) {
@@ -159,8 +179,20 @@ int main(int argc, char** argv) {
     }
   }
 
+  if(binary_path != NULL) {
+    binary_length = load_file(binary_path, &binary_data);
+    if(extra_length < 0) {
+      exit(FAILURE);
+    }
+  }
 
-  init_apple1(user_memory_size, rom_data, rom_length, extra_data, extra_length);
+  if(binary_path != NULL) {
+    // Init the emulator in binary mode: running a custom binary in the whole
+    // memory space area
+    init_apple1_binary(binary_data, binary_length, start_addr, load_addr);
+  } else {
+    init_apple1(user_memory_size, rom_data, rom_length, extra_data, extra_length);
+  }
   int ret = boot_apple1();
   if(ret != SUCCESS) {
     exit(FAILURE);

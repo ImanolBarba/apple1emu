@@ -162,6 +162,48 @@ int init_apple1(size_t user_ram_size, uint8_t* rom_data, size_t rom_length, uint
   return SUCCESS;
 }
 
+int init_apple1_binary(uint8_t* binary_data, size_t binary_length, uint16_t start_addr, uint16_t load_addr) {
+  int ret;
+
+  // Connect RAM
+  ret = init_mem(&user_ram, START_USER_RAM, MEMSIZE-1);
+  if(ret != SUCCESS) {
+    return FAILURE;
+  }
+  user_ram.addr_bus = &address_bus;
+  user_ram.data_bus = &data_bus;
+  user_ram.RW = &cpu.RW;
+
+  load_data(&user_ram, binary_data, binary_length, load_addr);
+  if(ret != SUCCESS) {
+    return FAILURE;
+  }
+
+  // Connect CPU
+  cpu.addr_bus = &address_bus;
+  cpu.data_bus = &data_bus;
+  cpu.IRQ = &on;
+  cpu.NMI = &on;
+  cpu.RDY = &on;
+  cpu.SO = &on;
+  cpu.RES = &reset_line;
+  // If the CPU stops, shut the rest of the stuff down
+  cpu.stop = &poweroff;
+  ret = clock_connect(&cpu.phi2, &user_ram_callback);
+  if(ret != SUCCESS) {
+    return FAILURE;
+  }
+
+  init_clock(&main_clock, CLOCK_SPEED);
+  ret = clock_connect(&main_clock, &cpu_callback);
+  if(ret != SUCCESS) {
+    return FAILURE;
+  }
+  main_clock.stop = &poweroff;
+
+  return SUCCESS;
+}
+
 void process_emulator_input(char key) {
   switch(key) {
     case EMULATOR_CONTINUE:
@@ -209,9 +251,9 @@ void print_greeting() {
 }
 
 int boot_apple1() {
+  init_cpu(&cpu);
   init_pia();
   print_greeting();
-  init_cpu(&cpu);
   pthread_t clock_thread;
   pthread_t input_thread;
   if(pthread_create(&input_thread, NULL, input_run, (void*)&poweroff)) {

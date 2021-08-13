@@ -1,0 +1,37 @@
+diff --git a/m6502.c b/m6502.c
+index 8954113..973b6d8 100644
+--- a/m6502.c
++++ b/m6502.c
+@@ -27,6 +27,10 @@
+ #include <fcntl.h>
+ #include <errno.h>
+ 
++#include "mem.h"
++
++uint16_t prev_fetch = 0x0000;
++
+ void get_arg_indirect_index(M6502* cpu) {
+     switch(cpu->IR & IR_STATUS_MASK) {
+     case 0:
+@@ -175,7 +179,21 @@ void branch(M6502* cpu, bool condition) {
+ }
+ 
+ void fetch(M6502* cpu) {
++  if(prev_fetch == 0x0000) {
++    cpu->PC = 0x0400;
++  }
++  if(prev_fetch == cpu->PC && cpu->PC != 0x3469) {
++    fprintf(stderr, "TRAP on 0x%04X, patching with NOPs\n", cpu->PC);
++    ((Mem_16*)cpu->phi2.clock_bus[0]->chip)->mem[cpu->PC] = 0xEA;
++    ((Mem_16*)cpu->phi2.clock_bus[0]->chip)->mem[cpu->PC+1] = 0xEA;
++  } else if(cpu->PC == 0x3469) {
++    fprintf(stderr, "SUCCESS!!!\n");
++    *cpu->stop = true;
++    return;
++  }
+   *cpu->addr_bus = cpu->PC;
++  prev_fetch = cpu->PC;
++
+   cpu->SYNC = true;
+ }
+ 
