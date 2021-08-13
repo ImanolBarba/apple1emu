@@ -192,8 +192,25 @@ void process_emulator_input(char key) {
   }
 }
 
+void print_greeting() {
+  printf("                   _        _                        \n");
+  printf("  __ _ _ __  _ __ | | ___  / |   ___ _ __ ___  _   _ \n");
+  printf(" / _` | '_ \\| '_ \\| |/ _ \\ | |  / _ \\ '_ ` _ \\| | | |\n");
+  printf("| (_| | |_) | |_) | |  __/ | | |  __/ | | | | | |_| |\n");
+  printf(" \\__,_| .__/| .__/|_|\\___| |_|  \\___|_| |_| |_|\\__,_|\n");
+  printf("      |_|   |_|                                      \n");
+  printf("\n");
+  printf("`: Clear screen\n");
+  printf("F5: Resume execution (From debugger)    F9: Break to debugger\n");
+  printf("F6: Save state                          F10: Step instruction\n");
+  printf("F7: Load state                          F11: Step clock cycle\n");
+  printf("F8: Reset                               F12: Print emulation speed\n");
+  printf("\n\n");
+}
+
 int boot_apple1() {
   init_pia();
+  print_greeting();
   init_cpu(&cpu);
   pthread_t clock_thread;
   pthread_t input_thread;
