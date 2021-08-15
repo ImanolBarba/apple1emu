@@ -459,15 +459,19 @@ int save_state(M6502* cpu) {
   state.break_status = cpu->break_status;
   state.AD = cpu->AD;
 
+  // Just in case, we'll restore later
+  cpu->RW = true;
+
   for(unsigned int i = 0; i < MEMSIZE; ++i) {
     *cpu->addr_bus = i;
     clock_cpu((void*)cpu, true);
     state.mem[i] = *cpu->data_bus;
   }
 
-  // Restore altered pins
+  // Restore bus and RW
   *cpu->addr_bus = state.addr_bus;
   *cpu->data_bus = state.data_bus;
+  cpu->RW = state.RW ? true : false;
 
   if(dump_file("savestate", (uint8_t*)&state, sizeof(state)) != SUCCESS) {
     cpu->enabled = true;
