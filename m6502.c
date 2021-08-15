@@ -588,6 +588,8 @@ void cpu_cycle(M6502* cpu) {
     cpu->status |= STATUS_VF;
   }
 
+  // TODO mem rw breakpoint
+
   if(cpu->SYNC) {
     if(cpu->break_status) {
       cpu->IR = 0x00; // BRK

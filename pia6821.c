@@ -214,6 +214,10 @@ void clear_screen() {
   write(STDOUT_FILENO, "\x1b[1;1H", 6);
 }
 
+void restore_term() {
+  tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+}
+
 void *input_run(void* ptr) {
   volatile bool* stop = (bool*)ptr;
   char special_input;
@@ -249,11 +253,8 @@ void *input_run(void* ptr) {
     }
   }
   fprintf(stderr, "Stopping input thread...\n");
+  restore_term();
   pthread_exit(0);
-}
-
-void restore_term() {
-  tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
 }
 
 void init_pia() {
@@ -263,5 +264,4 @@ void init_pia() {
   struct termios raw = orig_termios;
   raw.c_lflag &= ~(ECHO | ICANON);
   tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
-  clear_screen();
 }

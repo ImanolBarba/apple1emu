@@ -24,13 +24,15 @@
 #include "errors.h"
 #include "apple1.h"
 #include "pia6821.h"
+#include "m6502_opcodes.h"
 
 #include <stdio.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <signal.h>
+#include <string.h>
 
-// TODO: debugger
+bool debug_mode = false;
 
 float emulation_speed = 0.0;
 
@@ -210,20 +212,33 @@ int init_apple1_binary(uint8_t* binary_data, size_t binary_length, uint16_t star
 void process_emulator_input(char key) {
   switch(key) {
     case EMULATOR_CONTINUE:
-      //nothing
+        debug_mode = false;
     break;
     case EMULATOR_RESET:
       reset_line = false;
       clear_screen();
     break;
     case EMULATOR_BREAK:
-      //nothing
+      debug_mode = true;
+      poweroff = true;
     break;
     case EMULATOR_STEP_INSTRUCTION:
-      //nothing
+      if(debug_mode) {
+        do{
+          tick(&main_clock);
+          tock(&main_clock);
+        } while(!cpu.SYNC);
+        print_disassembly(&cpu, cpu.PC, 1);
+      }
     break;
     case EMULATOR_STEP_CLOCK:
-      //nothing
+      if(debug_mode) {
+        tick(&main_clock);
+        tock(&main_clock);
+        if(cpu.SYNC) {
+          print_disassembly(&cpu, cpu.PC, 1);
+        }
+      }
     break;
     case EMULATOR_PRINT_CYCLES:
       fprintf(stderr, "cycles per second: %.2f\n", emulation_speed);
@@ -250,17 +265,26 @@ void print_greeting() {
   printf("      |_|   |_|                                      \n");
   printf("\n");
   printf("`: Clear screen                         TAB: Toggle turbo mode\n");
-  printf("F5: Resume execution (From debugger)    F9: Break to debugger\n");
-  printf("F6: Save state                          F10: Step instruction\n");
-  printf("F7: Load state                          F11: Step clock cycle\n");
-  printf("F8: Reset                               F12: Print emulation speed\n");
+  printf("F5: Resume execution (From debugger)    F8: Reset\n");
+  printf("F6: Save state                          F9: Break to debugger\n");
+  printf("F7: Load state                          F12: Print emulation speed\n");
   printf("\n\n");
 }
 
-int boot_apple1() {
-  init_cpu(&cpu);
-  init_pia();
-  print_greeting();
+void print_debugger_help() {
+  printf("n or next: Step clock until the next instruction fetch\n");
+  printf("s or step: Step clock one full cycle\n");
+  printf("c or continue: Exit debugger and resume execution\n");
+  printf("l or list <ADDR>: Disassemble instructions around this address\n");
+  printf("b or breakpoint <ADDR>: Break when we try to execute this address\n");
+  printf("bw or breakpointw <ADDR>: Break when we try to write this address\n");
+  printf("br or breakpointr <ADDR>: Break when we try to read this address\n");
+  printf("set PC/A/X/Y/S/<ADDR> <VALUE>: Change value of the specified register or memory\n");
+  printf("h or help: This thing\n");
+  printf("q or quit: Exit the emulator\n");
+}
+
+int main_loop() {
   pthread_t clock_thread;
   pthread_t input_thread;
   if(pthread_create(&input_thread, NULL, input_run, (void*)&poweroff)) {
@@ -271,7 +295,6 @@ int boot_apple1() {
     fprintf(stderr, "Error creating thread\n");
     return ERROR_PTHREAD_CREATE;
   }
-
   while(!poweroff) {
     // Main control loop
     unsigned int start_ticks = cpu.tick_count;
@@ -298,7 +321,80 @@ int boot_apple1() {
     fprintf(stderr, "Error joining input thread\n");
     return ERROR_PTHREAD_JOIN;
   }
+  while(debug_mode) {
+    // The main control loop ended becase a break into debugger happened,
+    // we'll handle this until we resume, at which point the main control
+    // loop will be restarted by the parent function
 
+    // TODO: Need to find a way to provide input to the Apple I through
+    // the debugger without writing to memory, some input buffer of some
+    // kind
+
+    // We set poweroff to false again so that the CPU can work whenever
+    // we clock it manually
+    poweroff = false;
+    char input[64];
+    char prev_input[64];
+    printf("dbg> ");
+    char* line_read = fgets(input, 64, stdin);
+    if(line_read) {
+      if(!strncmp(line_read,"\n", 1)) {
+        // if empty line, replay last command
+        memcpy(input, prev_input, sizeof(input));  
+      } else {
+        memcpy(prev_input, input, sizeof(input));
+      }
+      if(!strncmp(line_read, "next\n", 5) || !strncmp(line_read, "n\n", 2)) {
+        process_emulator_input(EMULATOR_STEP_INSTRUCTION);
+      } else if(!strncmp(line_read, "step\n", 5) || !strncmp(line_read, "s\n", 2)) {
+        process_emulator_input(EMULATOR_STEP_CLOCK);
+      } else if(!strncmp(line_read, "continue\n", 9) || !strncmp(line_read, "c\n", 2)) {
+        process_emulator_input(EMULATOR_CONTINUE);
+      } else if(!strncmp(line_read, "help\n", 5) || !strncmp(line_read, "h\n", 2)) {
+        print_debugger_help();
+      } else if(!strncmp(line_read, "breakpoint ", 11) || !strncmp(line_read, "b ", 2)) {
+        // b/breakpoint ADDR
+        printf("TODO: breakpoint\n");
+      } else if(!strncmp(line_read, "breakpointw ", 11) || !strncmp(line_read, "bw ", 2)) {
+        // bw/breakpointw ADDR
+        printf("TODO: breakpointw\n");
+      } else if(!strncmp(line_read, "breakpointr ", 11) || !strncmp(line_read, "br ", 2)) {
+        // be/breakpointr ADDR
+        printf("TODO: breakpointr\n");
+      } else if(!strncmp(line_read, "list ", 5) || !strncmp(line_read, "l ", 2)) {
+        // l/list ADDR
+        printf("TODO: list\n");
+      } else if(!strncmp(line_read, "set ", 4)) {
+        // set PC/A/X/Y/S/ADDR value
+        printf("TODO: set\n");
+      } else if(!strncmp(line_read, "quit\n", 5) || !strncmp(line_read, "q\n", 2)) {
+        // When we exit the debug_mode loop, it'll either be with poweroff = false, because
+        // a continue was called, or poweroff = true because of this break here, which will
+        // cause the emulator to shut down, which is what we want
+        poweroff = true;
+        break;
+      } else {
+        printf("Unrecognised command: %s\n", input);
+      }
+    }
+  }
+
+  return SUCCESS;
+}
+
+int boot_apple1() {
+  init_cpu(&cpu);
+  clear_screen();
+  print_greeting();
+  while(!poweroff) {
+    init_pia();
+    // This loop basically checks if we exited the main loop but poweroff is not true, so we may
+    // restart it again. This would happen if we resumed from the debugger.
+    int ret = main_loop();
+    if(ret != SUCCESS) {
+      return FAILURE;
+    }
+  }
   destroy_mem(&user_ram);
   destroy_mem(&extra_ram);
   destroy_mem(&rom);
@@ -309,6 +405,7 @@ int boot_apple1() {
 void halt_apple1() {
   if(!poweroff) {
     fprintf(stderr, "Halting CPU...\n");
-    poweroff = true;
   }
+  poweroff = true;
+  debug_mode = false;
 }

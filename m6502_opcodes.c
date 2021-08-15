@@ -41,6 +41,7 @@ void do_00(M6502* cpu) {
     case 1:
       if(!cpu->break_status) {
         // manual BRK instruction, print break mark
+        // TODO breakpoint detection, restore original data, set PC -1, fetch(), launch debug escape sequence
         fprintf(stderr, "Triggered software BRK, reason: 0x%02X\n", *cpu->data_bus);
         cpu->PC++;
       }
@@ -2623,7 +2624,7 @@ void run_opcode(M6502* cpu)  {
   (*opcodes[cpu->IR >> 3]->op)(cpu);
 }
 
-void print_disassembly(M6502* cpu, uint16_t addr) {
+void print_disassembly(M6502* cpu, uint16_t addr, unsigned int num_instr) {
   cpu->enabled = false;
   while(cpu->active) {
     // spin
@@ -2632,96 +2633,101 @@ void print_disassembly(M6502* cpu, uint16_t addr) {
   uint8_t prev_data = *cpu->data_bus;
   uint16_t prev_addr = *cpu->addr_bus;
 
-  *cpu->data_bus = addr;
-  clock_cpu((void*)cpu, true);  
-  Opcode* op = opcodes[*cpu->data_bus];
-  
-  uint8_t arg_1, arg_2;
-  switch(op->addr_mode) {
-    case ADDR_IMPLICIT:
-      printf("0x%04X: %s\n", addr, op->name);
-    break;
-    case ADDR_ACCUMULATOR:
-      printf("0x%04X: %s A\n", addr, op->name);
-    break;
-    case ADDR_IMMEDIATE:
-      *cpu->addr_bus = addr + 1;
-      clock_cpu((void*)cpu, true);  
-      arg_1 = *cpu->data_bus;
-      printf("0x%04X: %s $#%02X\n", addr, op->name, arg_1);
-    break;
-    case ADDR_ZPG:
-      *cpu->addr_bus = addr + 1;
-      clock_cpu((void*)cpu, true);  
-      arg_1 = *cpu->data_bus;
-      printf("0x%04X: %s $%02X\n", addr, op->name, arg_1);
-    break;
-    case ADDR_ZPG_X:
-      *cpu->addr_bus = addr + 1;
-      clock_cpu((void*)cpu, true);  
-      arg_1 = *cpu->data_bus;
-      printf("0x%04X: %s $%02X,X\n", addr, op->name, arg_1);
-    break;
-    case ADDR_ZPG_Y:
-      *cpu->addr_bus = addr + 1;
-      clock_cpu((void*)cpu, true);  
-      arg_1 = *cpu->data_bus;
-      printf("0x%04X: %s $%02X,Y\n", addr, op->name, arg_1);
-    break;
-    case ADDR_RELATIVE:
-      *cpu->addr_bus = addr + 1;
-      clock_cpu((void*)cpu, true);  
-      arg_1 = *cpu->data_bus;
-      printf("0x%04X: %s $%02X\n", addr, op->name, addr + 2 + (int8_t)arg_1);
-    break;
-    case ADDR_ABSOLUTE:
-      *cpu->addr_bus = addr + 1;
-      clock_cpu((void*)cpu, true);  
-      arg_1 = *cpu->data_bus;
-      *cpu->addr_bus = addr + 2;
-      clock_cpu((void*)cpu, true);  
-      arg_2 = *cpu->data_bus;
-      printf("0x%04X: %s $%02X%02X\n", addr, op->name, arg_2, arg_1);
-    break;
-    case ADDR_ABSOLUTE_X:
-      *cpu->addr_bus = addr + 1;
-      clock_cpu((void*)cpu, true);  
-      arg_1 = *cpu->data_bus;
-      *cpu->addr_bus = addr + 2;
-      clock_cpu((void*)cpu, true);  
-      arg_2 = *cpu->data_bus;
-      printf("0x%04X: %s $%02X%02X,X\n", addr, op->name, arg_2, arg_1);
-    break;
-    case ADDR_ABSOLUTE_Y:
-      *cpu->addr_bus = addr + 1;
-      clock_cpu((void*)cpu, true);  
-      arg_1 = *cpu->data_bus;
-      *cpu->addr_bus = addr + 2;
-      clock_cpu((void*)cpu, true);  
-      arg_2 = *cpu->data_bus;
-      printf("0x%04X: %s $%02X%02X,Y\n", addr, op->name, arg_2, arg_1);
-    break;
-    case ADDR_INDIRECT:
-      *cpu->addr_bus = addr + 1;
-      clock_cpu((void*)cpu, true);  
-      arg_1 = *cpu->data_bus;
-      *cpu->addr_bus = addr + 2;
-      clock_cpu((void*)cpu, true);  
-      arg_2 = *cpu->data_bus;
-      printf("0x%04X: %s ($%02X%02X)\n", addr, op->name, arg_2, arg_1);
-    break;
-    case ADDR_INDEX_IND:
-      *cpu->addr_bus = addr + 1;
-      clock_cpu((void*)cpu, true);  
-      arg_1 = *cpu->data_bus;
-      printf("0x%04X: %s ($%02X,X)\n", addr, op->name, arg_1);
-    break;
-    case ADDR_IND_INDEX:
-      *cpu->addr_bus = addr + 1;
-      clock_cpu((void*)cpu, true);  
-      arg_1 = *cpu->data_bus;
-      printf("0x%04X: %s ($%02X),Y\n", addr, op->name, arg_1);
-    break;
+  unsigned int instr_index = 0;
+  uint16_t current_addr_offset = 0;
+
+  while(instr_index++ != num_instr) {
+    *cpu->data_bus = addr + current_addr_offset++;
+    clock_cpu((void*)cpu, true);  
+    Opcode* op = opcodes[*cpu->data_bus];
+    
+    uint8_t arg_1, arg_2;
+    switch(op->addr_mode) {
+      case ADDR_IMPLICIT:
+        printf("0x%04X: %s\n", addr, op->name);
+      break;
+      case ADDR_ACCUMULATOR:
+        printf("0x%04X: %s A\n", addr, op->name);
+      break;
+      case ADDR_IMMEDIATE:
+        *cpu->addr_bus = addr + current_addr_offset++;
+        clock_cpu((void*)cpu, true);  
+        arg_1 = *cpu->data_bus;
+        printf("0x%04X: %s $#%02X\n", addr, op->name, arg_1);
+      break;
+      case ADDR_ZPG:
+        *cpu->addr_bus = addr + current_addr_offset++;
+        clock_cpu((void*)cpu, true);  
+        arg_1 = *cpu->data_bus;
+        printf("0x%04X: %s $%02X\n", addr, op->name, arg_1);
+      break;
+      case ADDR_ZPG_X:
+        *cpu->addr_bus = addr + current_addr_offset++;
+        clock_cpu((void*)cpu, true);  
+        arg_1 = *cpu->data_bus;
+        printf("0x%04X: %s $%02X,X\n", addr, op->name, arg_1);
+      break;
+      case ADDR_ZPG_Y:
+        *cpu->addr_bus = addr + current_addr_offset++;
+        clock_cpu((void*)cpu, true);  
+        arg_1 = *cpu->data_bus;
+        printf("0x%04X: %s $%02X,Y\n", addr, op->name, arg_1);
+      break;
+      case ADDR_RELATIVE:
+        *cpu->addr_bus = addr + current_addr_offset++;
+        clock_cpu((void*)cpu, true);  
+        arg_1 = *cpu->data_bus;
+        printf("0x%04X: %s $%02X\n", addr, op->name, addr + current_addr_offset + (int8_t)arg_1);
+      break;
+      case ADDR_ABSOLUTE:
+        *cpu->addr_bus = addr + current_addr_offset++;
+        clock_cpu((void*)cpu, true);  
+        arg_1 = *cpu->data_bus;
+        *cpu->addr_bus = addr + current_addr_offset++;
+        clock_cpu((void*)cpu, true);  
+        arg_2 = *cpu->data_bus;
+        printf("0x%04X: %s $%02X%02X\n", addr, op->name, arg_2, arg_1);
+      break;
+      case ADDR_ABSOLUTE_X:
+        *cpu->addr_bus = addr + current_addr_offset++;
+        clock_cpu((void*)cpu, true);  
+        arg_1 = *cpu->data_bus;
+        *cpu->addr_bus = addr + current_addr_offset++;
+        clock_cpu((void*)cpu, true);  
+        arg_2 = *cpu->data_bus;
+        printf("0x%04X: %s $%02X%02X,X\n", addr, op->name, arg_2, arg_1);
+      break;
+      case ADDR_ABSOLUTE_Y:
+        *cpu->addr_bus = addr + current_addr_offset++;
+        clock_cpu((void*)cpu, true);  
+        arg_1 = *cpu->data_bus;
+        *cpu->addr_bus = addr + current_addr_offset++;
+        clock_cpu((void*)cpu, true);  
+        arg_2 = *cpu->data_bus;
+        printf("0x%04X: %s $%02X%02X,Y\n", addr, op->name, arg_2, arg_1);
+      break;
+      case ADDR_INDIRECT:
+        *cpu->addr_bus = addr + current_addr_offset++;
+        clock_cpu((void*)cpu, true);  
+        arg_1 = *cpu->data_bus;
+        *cpu->addr_bus = addr + current_addr_offset++;
+        clock_cpu((void*)cpu, true);  
+        arg_2 = *cpu->data_bus;
+        printf("0x%04X: %s ($%02X%02X)\n", addr, op->name, arg_2, arg_1);
+      break;
+      case ADDR_INDEX_IND:
+        *cpu->addr_bus = addr + current_addr_offset++;
+        clock_cpu((void*)cpu, true);  
+        arg_1 = *cpu->data_bus;
+        printf("0x%04X: %s ($%02X,X)\n", addr, op->name, arg_1);
+      break;
+      case ADDR_IND_INDEX:
+        *cpu->addr_bus = addr + current_addr_offset++;
+        clock_cpu((void*)cpu, true);  
+        arg_1 = *cpu->data_bus;
+        printf("0x%04X: %s ($%02X),Y\n", addr, op->name, arg_1);
+      break;
+    }
   }
 
   // Restore bus
