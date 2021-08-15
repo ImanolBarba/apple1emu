@@ -25,7 +25,33 @@
 
 #define IR_STATUS_MASK 0x7
 
+enum addressing_modes {
+  ADDR_IMPLICIT = 0,
+  ADDR_ACCUMULATOR = 1,
+  ADDR_IMMEDIATE = 2,
+  ADDR_ZPG = 3,
+  ADDR_ZPG_X = 4,
+  ADDR_ZPG_Y = 5,
+  ADDR_RELATIVE = 6,
+  ADDR_ABSOLUTE = 7,
+  ADDR_ABSOLUTE_X = 8,
+  ADDR_ABSOLUTE_Y = 9,
+  ADDR_INDIRECT = 10,
+  ADDR_INDEX_IND = 11,
+  ADDR_IND_INDEX = 12
+};
+
+typedef void (*opcode_func)(M6502*);
+
+typedef struct {
+  const char* name;
+  opcode_func op;
+  bool write;
+  int addr_mode;
+} Opcode;
+
+Opcode* opcodes[0x100];
+
 void run_opcode(M6502* cpu);
-bool is_write_opcode(uint8_t op);
 
 #endif

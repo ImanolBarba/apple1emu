@@ -43,7 +43,7 @@ void get_arg_indirect_index(M6502* cpu) {
     case 3:
       cpu->AD |= *cpu->data_bus << 8; // full addr
       *cpu->addr_bus = (cpu->AD & 0xFF00) | (cpu->AD + cpu->Y);
-      if(((cpu->AD + cpu->Y) <= 0xFF) && !is_write_opcode(cpu->IR >> 3)) {
+      if(((cpu->AD + cpu->Y) <= 0xFF) && !opcodes[(cpu->IR >> 3)]->write) {
         // if we're on the same page already, 1 less cycle
         cpu->IR++;
       }
@@ -124,7 +124,7 @@ void get_arg_absolute_index(M6502* cpu, uint8_t index) {
     case 2:
       cpu->AD |= *cpu->data_bus << 8;
       *cpu->addr_bus = cpu->AD + index;
-      if(!(((cpu->AD & 0x00FF) + index) & 0xFF00) && !is_write_opcode(cpu->IR >> 3)) {
+      if(!(((cpu->AD & 0x00FF) + index) & 0xFF00) && !opcodes[(cpu->IR >> 3)]->write) {
         // Opcodes that write to the data bus while using this addressing always
         // take 1 extra cycle irregardless of whether or not the destination is
         // in the same page, so in that case, skip this skip.

@@ -23,28 +23,15 @@
 
 #include <stdio.h>
 
-typedef void (*opcode_func)(M6502*);
-
-bool is_write_opcode(uint8_t op) {
-  // Not ideal, but hey, it works
-  return (op == 0x0A || op == 0x06 || op == 0x16 || op == 0x0E || op == 0x1E ||
-          op == 0x85 || op == 0x95 || op == 0x8D || op == 0x9D || op == 0x99 ||
-          op == 0x81 || op == 0x91 || op == 0xC6 || op == 0xD6 || op == 0xCE ||
-          op == 0xDE || op == 0xE6 || op == 0xF6 || op == 0xEE || op == 0xFE ||
-          op == 0x4A || op == 0x46 || op == 0x56 || op == 0x4E || op == 0x5E ||
-          op == 0x6A || op == 0x66 || op == 0x76 || op == 0x6E || op == 0x7E ||
-          op == 0x2A || op == 0x26 || op == 0x36 || op == 0x2E || op == 0x3E);
-}
-
 // UNDEF
-void op_XX(M6502* cpu) {
+void do_XX(M6502* cpu) {
   fprintf(stderr, "Unknown opcode: 0x%02X\n", cpu->IR >> 3);
   cpu_crash(cpu);
   fetch(cpu);
 }
 
 // BRK
-void op_00(M6502* cpu) {
+void do_00(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       // The 6502 does this on the first cycle of interrupt for implicit addressing,
@@ -103,7 +90,7 @@ void op_00(M6502* cpu) {
 }
 
 // ORA X,ind
-void op_01(M6502* cpu) {
+void do_01(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 5) {
     get_arg_index_indirect(cpu);
     return;
@@ -113,7 +100,7 @@ void op_01(M6502* cpu) {
 }
 
 // ORA zpg
-void op_05(M6502* cpu) {
+void do_05(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page(cpu);
     return;
@@ -123,7 +110,7 @@ void op_05(M6502* cpu) {
 }
 
 // ASL zpg
-void op_06(M6502* cpu) {
+void do_06(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page(cpu);
     return;
@@ -145,7 +132,7 @@ void op_06(M6502* cpu) {
 }
 
 // PHP
-void op_08(M6502* cpu) {
+void do_08(M6502* cpu) {
    switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -160,7 +147,7 @@ void op_08(M6502* cpu) {
 }
 
 // ORA #
-void op_09(M6502* cpu) {
+void do_09(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
@@ -173,7 +160,7 @@ void op_09(M6502* cpu) {
 }
 
 // ASL A
-void op_0A(M6502* cpu) {
+void do_0A(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -186,7 +173,7 @@ void op_0A(M6502* cpu) {
 }
 
 // ORA Abs
-void op_0D(M6502* cpu) {
+void do_0D(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute(cpu);
     return;
@@ -196,7 +183,7 @@ void op_0D(M6502* cpu) {
 }
 
 // ASL Abs
-void op_0E(M6502* cpu) {
+void do_0E(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute(cpu);
     return;
@@ -217,12 +204,12 @@ void op_0E(M6502* cpu) {
 }
 
 // BPL rel
-void op_10(M6502* cpu) {
+void do_10(M6502* cpu) {
   branch(cpu, !(cpu->status & STATUS_NF));
 }
 
 // ORA ind, Y
-void op_11(M6502* cpu) {
+void do_11(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 5) {
     get_arg_indirect_index(cpu);
     return;
@@ -232,7 +219,7 @@ void op_11(M6502* cpu) {
 }
 
 // ORA zpg, X
-void op_15(M6502* cpu) {
+void do_15(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_zero_page_index(cpu, cpu->X);
     return;
@@ -242,7 +229,7 @@ void op_15(M6502* cpu) {
 }
 
 // ASL zpg, X
-void op_16(M6502* cpu) {
+void do_16(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_zero_page_index(cpu, cpu->X);
     return;
@@ -263,7 +250,7 @@ void op_16(M6502* cpu) {
 }
 
 // CLC
-void op_18(M6502* cpu) {
+void do_18(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -276,7 +263,7 @@ void op_18(M6502* cpu) {
 }
 
 // ORA abs, Y
-void op_19(M6502* cpu) {
+void do_19(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->Y);
     return;
@@ -286,7 +273,7 @@ void op_19(M6502* cpu) {
 }
 
 // ORA abs, X
-void op_1D(M6502* cpu) {
+void do_1D(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->X);
     return;
@@ -296,7 +283,7 @@ void op_1D(M6502* cpu) {
 }
 
 // ASL abs, X
-void op_1E(M6502* cpu) {
+void do_1E(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->X);
     return;
@@ -317,7 +304,7 @@ void op_1E(M6502* cpu) {
 }
 
 // JSR abs
-void op_20(M6502* cpu) {
+void do_20(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
@@ -343,7 +330,7 @@ void op_20(M6502* cpu) {
 }
 
 // AND X, ind
-void op_21(M6502* cpu) {
+void do_21(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 5) {
     get_arg_index_indirect(cpu);
     return;
@@ -353,7 +340,7 @@ void op_21(M6502* cpu) {
 }
 
 // BIT zpg
-void op_24(M6502* cpu) {
+void do_24(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page(cpu);
     return;
@@ -363,7 +350,7 @@ void op_24(M6502* cpu) {
 }
 
 // AND zpg
-void op_25(M6502* cpu) {
+void do_25(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page(cpu);
     return;
@@ -373,7 +360,7 @@ void op_25(M6502* cpu) {
 }
 
 // ROL zpg
-void op_26(M6502* cpu) {
+void do_26(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page(cpu);
     return;
@@ -394,7 +381,7 @@ void op_26(M6502* cpu) {
 }
 
 // PLP
-void op_28(M6502* cpu) {
+void do_28(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -413,7 +400,7 @@ void op_28(M6502* cpu) {
 }
 
 // AND #
-void op_29(M6502* cpu) {
+void do_29(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
@@ -426,7 +413,7 @@ void op_29(M6502* cpu) {
 }
 
 // ROL A
-void op_2A(M6502* cpu) {
+void do_2A(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -439,7 +426,7 @@ void op_2A(M6502* cpu) {
 }
 
 // BIT abs
-void op_2C(M6502* cpu) {
+void do_2C(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute(cpu);
     return;
@@ -449,7 +436,7 @@ void op_2C(M6502* cpu) {
 }
 
 // AND Abs
-void op_2D(M6502* cpu) {
+void do_2D(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute(cpu);
     return;
@@ -459,7 +446,7 @@ void op_2D(M6502* cpu) {
 }
 
 // ROL Abs
-void op_2E(M6502* cpu) {
+void do_2E(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute(cpu);
     return;
@@ -480,12 +467,12 @@ void op_2E(M6502* cpu) {
 }
 
 // BMI
-void op_30(M6502* cpu) {
+void do_30(M6502* cpu) {
   branch(cpu, cpu->status & STATUS_NF);
 }
 
 // AND ind, Y
-void op_31(M6502* cpu) {
+void do_31(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 5) {
     get_arg_indirect_index(cpu);
     return;
@@ -495,7 +482,7 @@ void op_31(M6502* cpu) {
 }
 
 // AND zpg, X
-void op_35(M6502* cpu) {
+void do_35(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_zero_page_index(cpu, cpu->X);
     return;
@@ -505,7 +492,7 @@ void op_35(M6502* cpu) {
 }
 
 // ROL zpg, X
-void op_36(M6502* cpu) {
+void do_36(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_zero_page_index(cpu, cpu->X);
     return;
@@ -526,7 +513,7 @@ void op_36(M6502* cpu) {
 }
 
 // SEC
-void op_38(M6502* cpu) {
+void do_38(M6502* cpu) {
  switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -539,7 +526,7 @@ void op_38(M6502* cpu) {
 }
 
 // AND abs, Y
-void op_39(M6502* cpu) {
+void do_39(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->Y);
     return;
@@ -549,7 +536,7 @@ void op_39(M6502* cpu) {
 }
 
 // AND abs, X
-void op_3D(M6502* cpu) {
+void do_3D(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->X);
     return;
@@ -559,7 +546,7 @@ void op_3D(M6502* cpu) {
 }
 
 // ROL abs, X
-void op_3E(M6502* cpu) {
+void do_3E(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->X);
     return;
@@ -580,7 +567,7 @@ void op_3E(M6502* cpu) {
 }
 
 // RTI
-void op_40(M6502* cpu) {
+void do_40(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -607,7 +594,7 @@ void op_40(M6502* cpu) {
 }
 
 // EOR X, ind
-void op_41(M6502* cpu) {
+void do_41(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 5) {
     get_arg_index_indirect(cpu);
     return;
@@ -617,7 +604,7 @@ void op_41(M6502* cpu) {
 }
 
 // EOR zpg
-void op_45(M6502* cpu) {
+void do_45(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page(cpu);
     return;
@@ -627,7 +614,7 @@ void op_45(M6502* cpu) {
 }
 
 // LSR zpg
-void op_46(M6502* cpu) {
+void do_46(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page(cpu);
     return;
@@ -648,7 +635,7 @@ void op_46(M6502* cpu) {
 }
 
 // PHA
-void op_48(M6502* cpu) {
+void do_48(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -663,7 +650,7 @@ void op_48(M6502* cpu) {
 }
 
 // EOR #
-void op_49(M6502* cpu) {
+void do_49(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
@@ -676,7 +663,7 @@ void op_49(M6502* cpu) {
 }
 
 // LSR A
-void op_4A(M6502* cpu) {
+void do_4A(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -689,7 +676,7 @@ void op_4A(M6502* cpu) {
 }
 
 // JMP abs
-void op_4C(M6502* cpu) {
+void do_4C(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
@@ -706,7 +693,7 @@ void op_4C(M6502* cpu) {
 }
 
 // EOR Abs
-void op_4D(M6502* cpu) {
+void do_4D(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute(cpu);
     return;
@@ -716,7 +703,7 @@ void op_4D(M6502* cpu) {
 }
 
 // LSR Abs
-void op_4E(M6502* cpu) {
+void do_4E(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute(cpu);
     return;
@@ -737,12 +724,12 @@ void op_4E(M6502* cpu) {
 }
 
 // BVC
-void op_50(M6502* cpu) {
+void do_50(M6502* cpu) {
   branch(cpu, !(cpu->status & STATUS_VF));
 }
 
 // EOR ind, Y
-void op_51(M6502* cpu) {
+void do_51(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 5) {
     get_arg_indirect_index(cpu);
     return;
@@ -752,7 +739,7 @@ void op_51(M6502* cpu) {
 }
 
 // EOR zpg, X
-void op_55(M6502* cpu) {
+void do_55(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_zero_page_index(cpu, cpu->X);
     return;
@@ -762,7 +749,7 @@ void op_55(M6502* cpu) {
 }
 
 // LSR zpg, X
-void op_56(M6502* cpu) {
+void do_56(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_zero_page_index(cpu, cpu->X);
     return;
@@ -783,7 +770,7 @@ void op_56(M6502* cpu) {
 }
 
 // CLI
-void op_58(M6502* cpu) {
+void do_58(M6502* cpu) {
  switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -796,7 +783,7 @@ void op_58(M6502* cpu) {
 }
 
 // EOR abs, Y
-void op_59(M6502* cpu) {
+void do_59(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->Y);
     return;
@@ -806,7 +793,7 @@ void op_59(M6502* cpu) {
 }
 
 // EOR abs, X
-void op_5D(M6502* cpu) {
+void do_5D(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->X);
     return;
@@ -816,7 +803,7 @@ void op_5D(M6502* cpu) {
 }
 
 // LSR abs, X
-void op_5E(M6502* cpu) {
+void do_5E(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->X);
     return;
@@ -837,7 +824,7 @@ void op_5E(M6502* cpu) {
 }
 
 // RTS
-void op_60(M6502* cpu) {
+void do_60(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -863,7 +850,7 @@ void op_60(M6502* cpu) {
 }
 
 // ADC X, ind
-void op_61(M6502* cpu) {
+void do_61(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 5) {
     get_arg_index_indirect(cpu);
     return;
@@ -873,7 +860,7 @@ void op_61(M6502* cpu) {
 }
 
 // ADC zpg
-void op_65(M6502* cpu) {
+void do_65(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page(cpu);
     return;
@@ -883,7 +870,7 @@ void op_65(M6502* cpu) {
 }
 
 // ROR zpg
-void op_66(M6502* cpu) {
+void do_66(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page(cpu);
     return;
@@ -904,7 +891,7 @@ void op_66(M6502* cpu) {
 }
 
 // PLA
-void op_68(M6502* cpu) {
+void do_68(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -924,7 +911,7 @@ void op_68(M6502* cpu) {
 }
 
 // ADC #
-void op_69(M6502* cpu) {
+void do_69(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
@@ -937,7 +924,7 @@ void op_69(M6502* cpu) {
 }
 
 // ROR A
-void op_6A(M6502* cpu) {
+void do_6A(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -950,7 +937,7 @@ void op_6A(M6502* cpu) {
 }
 
 // JMP ind
-void op_6C(M6502* cpu) {
+void do_6C(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
@@ -975,7 +962,7 @@ void op_6C(M6502* cpu) {
 }
 
 // ADC Abs
-void op_6D(M6502* cpu) {
+void do_6D(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute(cpu);
     return;
@@ -985,7 +972,7 @@ void op_6D(M6502* cpu) {
 }
 
 // ROR Abs
-void op_6E(M6502* cpu) {
+void do_6E(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute(cpu);
     return;
@@ -1006,12 +993,12 @@ void op_6E(M6502* cpu) {
 }
 
 // BVS
-void op_70(M6502* cpu) {
+void do_70(M6502* cpu) {
   branch(cpu, cpu->status & STATUS_VF);
 }
 
 // ADC ind, Y
-void op_71(M6502* cpu) {
+void do_71(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 5) {
     get_arg_indirect_index(cpu);
     return;
@@ -1021,7 +1008,7 @@ void op_71(M6502* cpu) {
 }
 
 // ADC zpg, X
-void op_75(M6502* cpu) {
+void do_75(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_zero_page_index(cpu, cpu->X);
     return;
@@ -1031,7 +1018,7 @@ void op_75(M6502* cpu) {
 }
 
 // ROR zpg, X
-void op_76(M6502* cpu) {
+void do_76(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_zero_page_index(cpu, cpu->X);
     return;
@@ -1052,7 +1039,7 @@ void op_76(M6502* cpu) {
 }
 
 // SEI
-void op_78(M6502* cpu) {
+void do_78(M6502* cpu) {
  switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -1065,7 +1052,7 @@ void op_78(M6502* cpu) {
 }
 
 // ADC abs, Y
-void op_79(M6502* cpu) {
+void do_79(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->Y);
     return;
@@ -1075,7 +1062,7 @@ void op_79(M6502* cpu) {
 }
 
 // ADC abs, X
-void op_7D(M6502* cpu) {
+void do_7D(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->X);
     return;
@@ -1085,7 +1072,7 @@ void op_7D(M6502* cpu) {
 }
 
 // ROR abs, X
-void op_7E(M6502* cpu) {
+void do_7E(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->X);
     return;
@@ -1106,7 +1093,7 @@ void op_7E(M6502* cpu) {
 }
 
 // STA X, ind
-void op_81(M6502* cpu) {
+void do_81(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_index_indirect(cpu);
     return;
@@ -1125,7 +1112,7 @@ void op_81(M6502* cpu) {
 }
 
 // STY zpg
-void op_84(M6502* cpu) {
+void do_84(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 1) {
     get_arg_zero_page(cpu);
     return;
@@ -1143,7 +1130,7 @@ void op_84(M6502* cpu) {
 }
 
 // STA zpg
-void op_85(M6502* cpu) {
+void do_85(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 1) {
     get_arg_zero_page(cpu);
     return;
@@ -1161,7 +1148,7 @@ void op_85(M6502* cpu) {
 }
 
 // STX zpg
-void op_86(M6502* cpu) {
+void do_86(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 1) {
     get_arg_zero_page(cpu);
     return;
@@ -1179,7 +1166,7 @@ void op_86(M6502* cpu) {
 }
 
 // DEY
-void op_88(M6502* cpu) {
+void do_88(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -1193,7 +1180,7 @@ void op_88(M6502* cpu) {
 }
 
 // TXA
-void op_8A(M6502* cpu) {
+void do_8A(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -1207,7 +1194,7 @@ void op_8A(M6502* cpu) {
 }
 
 // STY abs
-void op_8C(M6502* cpu) {
+void do_8C(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_absolute(cpu);
     return;
@@ -1225,7 +1212,7 @@ void op_8C(M6502* cpu) {
 }
 
 // STA abs
-void op_8D(M6502* cpu) {
+void do_8D(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_absolute(cpu);
     return;
@@ -1243,7 +1230,7 @@ void op_8D(M6502* cpu) {
 }
 
 // STX abs
-void op_8E(M6502* cpu) {
+void do_8E(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_absolute(cpu);
     return;
@@ -1261,12 +1248,12 @@ void op_8E(M6502* cpu) {
 }
 
 // BCC
-void op_90(M6502* cpu) {
+void do_90(M6502* cpu) {
   branch(cpu, !(cpu->status & STATUS_CF));
 }
 
 // STA ind, Y
-void op_91(M6502* cpu) {
+void do_91(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_indirect_index(cpu);
     return;
@@ -1284,7 +1271,7 @@ void op_91(M6502* cpu) {
 }
 
 // STY zpg, X
-void op_94(M6502* cpu) {
+void do_94(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page_index(cpu, cpu->X);
     return;
@@ -1302,7 +1289,7 @@ void op_94(M6502* cpu) {
 }
 
 // STA zpg, X
-void op_95(M6502* cpu) {
+void do_95(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page_index(cpu, cpu->X);
     return;
@@ -1320,7 +1307,7 @@ void op_95(M6502* cpu) {
 }
 
 // STX zpg, Y
-void op_96(M6502* cpu) {
+void do_96(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page_index(cpu, cpu->Y);
     return;
@@ -1338,7 +1325,7 @@ void op_96(M6502* cpu) {
 }
 
 // TYA
-void op_98(M6502* cpu) {
+void do_98(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -1352,7 +1339,7 @@ void op_98(M6502* cpu) {
 }
 
 // STA abs, Y
-void op_99(M6502* cpu) {
+void do_99(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute_index(cpu, cpu->Y);
     return;
@@ -1370,7 +1357,7 @@ void op_99(M6502* cpu) {
 }
 
 // TXS
-void op_9A(M6502* cpu) {
+void do_9A(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -1383,7 +1370,7 @@ void op_9A(M6502* cpu) {
 }
 
 // STA abs, X
-void op_9D(M6502* cpu) {
+void do_9D(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute_index(cpu, cpu->X);
     return;
@@ -1401,7 +1388,7 @@ void op_9D(M6502* cpu) {
 }
 
 // LDY imm
-void op_A0(M6502* cpu) {
+void do_A0(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
@@ -1414,7 +1401,7 @@ void op_A0(M6502* cpu) {
 }
 
 // LDA X, ind
-void op_A1(M6502* cpu) {
+void do_A1(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 5) {
     get_arg_index_indirect(cpu);
     return;
@@ -1424,7 +1411,7 @@ void op_A1(M6502* cpu) {
 }
 
 // LDX imm
-void op_A2(M6502* cpu) {
+void do_A2(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
@@ -1437,7 +1424,7 @@ void op_A2(M6502* cpu) {
 }
 
 // LDY zpg
-void op_A4(M6502* cpu) {
+void do_A4(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page(cpu);
     return;
@@ -1447,7 +1434,7 @@ void op_A4(M6502* cpu) {
 }
 
 // LDA zpg
-void op_A5(M6502* cpu) {
+void do_A5(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page(cpu);
     return;
@@ -1457,7 +1444,7 @@ void op_A5(M6502* cpu) {
 }
 
 // LDX zpg
-void op_A6(M6502* cpu) {
+void do_A6(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page(cpu);
     return;
@@ -1467,7 +1454,7 @@ void op_A6(M6502* cpu) {
 }
 
 // TAY
-void op_A8(M6502* cpu) {
+void do_A8(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -1481,7 +1468,7 @@ void op_A8(M6502* cpu) {
 }
 
 // LDA imm
-void op_A9(M6502* cpu) {
+void do_A9(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
@@ -1494,7 +1481,7 @@ void op_A9(M6502* cpu) {
 }
 
 // TAX
-void op_AA(M6502* cpu) {
+void do_AA(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -1508,7 +1495,7 @@ void op_AA(M6502* cpu) {
 }
 
 // LDY abs
-void op_AC(M6502* cpu) {
+void do_AC(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute(cpu);
     return;
@@ -1518,7 +1505,7 @@ void op_AC(M6502* cpu) {
 }
 
 // LDA abs
-void op_AD(M6502* cpu) {
+void do_AD(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute(cpu);
     return;
@@ -1528,7 +1515,7 @@ void op_AD(M6502* cpu) {
 }
 
 // LDX abs
-void op_AE(M6502* cpu) {
+void do_AE(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute(cpu);
     return;
@@ -1538,12 +1525,12 @@ void op_AE(M6502* cpu) {
 }
 
 // BCS
-void op_B0(M6502* cpu) {
+void do_B0(M6502* cpu) {
   branch(cpu, cpu->status & STATUS_CF);
 }
 
 // LDA ind, Y
-void op_B1(M6502* cpu) {
+void do_B1(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 5) {
     get_arg_indirect_index(cpu);
     return;
@@ -1553,7 +1540,7 @@ void op_B1(M6502* cpu) {
 }
 
 // LDY zpg, X
-void op_B4(M6502* cpu) {
+void do_B4(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_zero_page_index(cpu, cpu->X);
     return;
@@ -1563,7 +1550,7 @@ void op_B4(M6502* cpu) {
 }
 
 // LDA zpg, X
-void op_B5(M6502* cpu) {
+void do_B5(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_zero_page_index(cpu, cpu->X);
     return;
@@ -1573,7 +1560,7 @@ void op_B5(M6502* cpu) {
 }
 
 // LDX zpg, Y
-void op_B6(M6502* cpu) {
+void do_B6(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_zero_page_index(cpu, cpu->Y);
     return;
@@ -1583,7 +1570,7 @@ void op_B6(M6502* cpu) {
 }
 
 // CLV
-void op_B8(M6502* cpu) {
+void do_B8(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -1596,7 +1583,7 @@ void op_B8(M6502* cpu) {
 }
 
 // LDA abs, Y
-void op_B9(M6502* cpu) {
+void do_B9(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->Y);
     return;
@@ -1606,7 +1593,7 @@ void op_B9(M6502* cpu) {
 }
 
 // TSX
-void op_BA(M6502* cpu) {
+void do_BA(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -1620,7 +1607,7 @@ void op_BA(M6502* cpu) {
 }
 
 // LDY abs, X
-void op_BC(M6502* cpu) {
+void do_BC(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->X);
     return;
@@ -1630,7 +1617,7 @@ void op_BC(M6502* cpu) {
 }
 
 // LDA abs, X
-void op_BD(M6502* cpu) {
+void do_BD(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->X);
     return;
@@ -1640,7 +1627,7 @@ void op_BD(M6502* cpu) {
 }
 
 // LDX abs, Y
-void op_BE(M6502* cpu) {
+void do_BE(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->Y);
     return;
@@ -1650,7 +1637,7 @@ void op_BE(M6502* cpu) {
 }
 
 // CPY imm
-void op_C0(M6502* cpu) {
+void do_C0(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
@@ -1663,7 +1650,7 @@ void op_C0(M6502* cpu) {
 }
 
 // CMP X, ind
-void op_C1(M6502* cpu) {
+void do_C1(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 5) {
     get_arg_index_indirect(cpu);
     return;
@@ -1673,7 +1660,7 @@ void op_C1(M6502* cpu) {
 }
 
 // CPY zpg
-void op_C4(M6502* cpu) {
+void do_C4(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page(cpu);
     return;
@@ -1683,7 +1670,7 @@ void op_C4(M6502* cpu) {
 }
 
 // CMP zpg
-void op_C5(M6502* cpu) {
+void do_C5(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page(cpu);
     return;
@@ -1693,7 +1680,7 @@ void op_C5(M6502* cpu) {
 }
 
 // DEC zpg
-void op_C6(M6502* cpu) {
+void do_C6(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page(cpu);
     return;
@@ -1716,7 +1703,7 @@ void op_C6(M6502* cpu) {
 }
 
 // INY
-void op_C8(M6502* cpu) {
+void do_C8(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -1730,7 +1717,7 @@ void op_C8(M6502* cpu) {
 }
 
 // CMP imm
-void op_C9(M6502* cpu) {
+void do_C9(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
@@ -1743,7 +1730,7 @@ void op_C9(M6502* cpu) {
 }
 
 // DEX
-void op_CA(M6502* cpu) {
+void do_CA(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -1757,7 +1744,7 @@ void op_CA(M6502* cpu) {
 }
 
 // CPY abs
-void op_CC(M6502* cpu) {
+void do_CC(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute(cpu);
     return;
@@ -1767,7 +1754,7 @@ void op_CC(M6502* cpu) {
 }
 
 // CMP abs
-void op_CD(M6502* cpu) {
+void do_CD(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute(cpu);
     return;
@@ -1777,7 +1764,7 @@ void op_CD(M6502* cpu) {
 }
 
 // DEC abs
-void op_CE(M6502* cpu) {
+void do_CE(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute(cpu);
     return;
@@ -1800,12 +1787,12 @@ void op_CE(M6502* cpu) {
 }
 
 // BNE
-void op_D0(M6502* cpu) {
+void do_D0(M6502* cpu) {
   branch(cpu, !(cpu->status & STATUS_ZF));
 }
 
 // CMP ind, Y
-void op_D1(M6502* cpu) {
+void do_D1(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 5) {
     get_arg_indirect_index(cpu);
     return;
@@ -1815,7 +1802,7 @@ void op_D1(M6502* cpu) {
 }
 
 // CMP zpg, X
-void op_D5(M6502* cpu) {
+void do_D5(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_zero_page_index(cpu, cpu->X);
     return;
@@ -1825,7 +1812,7 @@ void op_D5(M6502* cpu) {
 }
 
 // DEC zpg, X
-void op_D6(M6502* cpu) {
+void do_D6(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_zero_page_index(cpu, cpu->X);
     return;
@@ -1848,7 +1835,7 @@ void op_D6(M6502* cpu) {
 }
 
 // CLD
-void op_D8(M6502* cpu) {
+void do_D8(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -1861,7 +1848,7 @@ void op_D8(M6502* cpu) {
 }
 
 // CMP abs, Y
-void op_D9(M6502* cpu) {
+void do_D9(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->Y);
     return;
@@ -1871,7 +1858,7 @@ void op_D9(M6502* cpu) {
 }
 
 // CMP abs, X
-void op_DD(M6502* cpu) {
+void do_DD(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->X);
     return;
@@ -1881,7 +1868,7 @@ void op_DD(M6502* cpu) {
 }
 
 // DEC abs, X
-void op_DE(M6502* cpu) {
+void do_DE(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->X);
     return;
@@ -1904,7 +1891,7 @@ void op_DE(M6502* cpu) {
 }
 
 // CPX imm
-void op_E0(M6502* cpu) {
+void do_E0(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
@@ -1917,7 +1904,7 @@ void op_E0(M6502* cpu) {
 }
 
 // SBC X, ind
-void op_E1(M6502* cpu) {
+void do_E1(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 5) {
     get_arg_index_indirect(cpu);
     return;
@@ -1927,7 +1914,7 @@ void op_E1(M6502* cpu) {
 }
 
 // CPX zpg
-void op_E4(M6502* cpu) {
+void do_E4(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page(cpu);
     return;
@@ -1937,7 +1924,7 @@ void op_E4(M6502* cpu) {
 }
 
 // SBC zpg
-void op_E5(M6502* cpu) {
+void do_E5(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page(cpu);
     return;
@@ -1947,7 +1934,7 @@ void op_E5(M6502* cpu) {
 }
 
 // INC zpg
-void op_E6(M6502* cpu) {
+void do_E6(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 2) {
     get_arg_zero_page(cpu);
     return;
@@ -1970,7 +1957,7 @@ void op_E6(M6502* cpu) {
 }
 
 // INX
-void op_E8(M6502* cpu) {
+void do_E8(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -1984,7 +1971,7 @@ void op_E8(M6502* cpu) {
 }
 
 // SBC imm
-void op_E9(M6502* cpu) {
+void do_E9(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC++;
@@ -1997,7 +1984,7 @@ void op_E9(M6502* cpu) {
 }
 
 // NOP
-void op_EA(M6502* cpu) {
+void do_EA(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -2009,7 +1996,7 @@ void op_EA(M6502* cpu) {
 }
 
 // CPX abs
-void op_EC(M6502* cpu) {
+void do_EC(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute(cpu);
     return;
@@ -2019,7 +2006,7 @@ void op_EC(M6502* cpu) {
 }
 
 // SBC abs
-void op_ED(M6502* cpu) {
+void do_ED(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute(cpu);
     return;
@@ -2029,7 +2016,7 @@ void op_ED(M6502* cpu) {
 }
 
 // INC abs
-void op_EE(M6502* cpu) {
+void do_EE(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_absolute(cpu);
     return;
@@ -2052,12 +2039,12 @@ void op_EE(M6502* cpu) {
 }
 
 // BEQ
-void op_F0(M6502* cpu) {
+void do_F0(M6502* cpu) {
   branch(cpu, cpu->status & STATUS_ZF);
 }
 
 // SBC ind, Y
-void op_F1(M6502* cpu) {
+void do_F1(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 5) {
     get_arg_indirect_index(cpu);
     return;
@@ -2067,7 +2054,7 @@ void op_F1(M6502* cpu) {
 }
 
 // SBC zpg, X
-void op_F5(M6502* cpu) {
+void do_F5(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_zero_page_index(cpu, cpu->X);
     return;
@@ -2077,7 +2064,7 @@ void op_F5(M6502* cpu) {
 }
 
 // INC zpg, X
-void op_F6(M6502* cpu) {
+void do_F6(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 3) {
     get_arg_zero_page_index(cpu, cpu->X);
     return;
@@ -2100,7 +2087,7 @@ void op_F6(M6502* cpu) {
 }
 
 // SED
-void op_F8(M6502* cpu) {
+void do_F8(M6502* cpu) {
   switch(cpu->IR & IR_STATUS_MASK) {
     case 0:
       *cpu->addr_bus = cpu->PC;
@@ -2113,7 +2100,7 @@ void op_F8(M6502* cpu) {
 }
 
 // SBC abs, Y
-void op_F9(M6502* cpu) {
+void do_F9(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->Y);
     return;
@@ -2123,7 +2110,7 @@ void op_F9(M6502* cpu) {
 }
 
 // SBC abs, X
-void op_FD(M6502* cpu) {
+void do_FD(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->X);
     return;
@@ -2133,7 +2120,7 @@ void op_FD(M6502* cpu) {
 }
 
 // INC abs, X
-void op_FE(M6502* cpu) {
+void do_FE(M6502* cpu) {
   if((cpu->IR & IR_STATUS_MASK) < 4) {
     get_arg_absolute_index(cpu, cpu->X);
     return;
@@ -2155,8 +2142,465 @@ void op_FE(M6502* cpu) {
   }
 }
 
+Opcode op_XX = {
+  .name = "UNK", .op = &do_XX, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_00 = {
+  // Not really immediate addressing, but has the break mark, so...
+  .name = "BRK", .op = &do_00, .write = false, .addr_mode = ADDR_IMMEDIATE 
+};
+Opcode op_01 = {
+  .name = "ORA", .op = &do_01, .write = false, .addr_mode = ADDR_INDEX_IND
+};
+Opcode op_05 = {
+  .name = "ORA", .op = &do_05, .write = false, .addr_mode = ADDR_ZPG
+};
+Opcode op_06 = {
+  .name = "ASL", .op = &do_06, .write = true, .addr_mode = ADDR_ZPG
+};
+Opcode op_08 = {
+  .name = "PHP", .op = &do_08, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_09 = {
+  .name = "ORA", .op = &do_09, .write = false, .addr_mode = ADDR_IMMEDIATE
+};
+Opcode op_0A = {
+  .name = "ASL", .op = &do_0A, .write = true, .addr_mode = ADDR_ACCUMULATOR
+};
+Opcode op_0D = {
+  .name = "ORA", .op = &do_0D, .write = false, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_0E = {
+  .name = "ASL", .op = &do_0E, .write = true, .addr_mode = ADDR_ABSOLUTE 
+};
+Opcode op_10 = {
+  .name = "BPL", .op = &do_10, .write = false, .addr_mode = ADDR_RELATIVE
+};
+Opcode op_11 = {
+  .name = "ORA", .op = &do_11, .write = false, .addr_mode = ADDR_IND_INDEX
+};
+Opcode op_15 = {
+  .name = "ORA", .op = &do_15, .write = false, .addr_mode = ADDR_ZPG_X
+};
+Opcode op_16 = {
+  .name = "ASL", .op = &do_16, .write = true, .addr_mode = ADDR_ZPG_X
+};
+Opcode op_18 = {
+  .name = "CLC", .op = &do_18, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_19 = {
+  .name = "ORA", .op = &do_19, .write = false, .addr_mode = ADDR_ABSOLUTE_Y
+};
+Opcode op_1D = {
+  .name = "ORA", .op = &do_1D, .write = false, .addr_mode = ADDR_ABSOLUTE_X
+};
+Opcode op_1E = {
+  .name = "ASL", .op = &do_1E, .write = true, .addr_mode = ADDR_ABSOLUTE_X
+};
+Opcode op_20 = {
+  .name = "JSR", .op = &do_20, .write = false, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_21 = {
+  .name = "AND", .op = &do_21, .write = false, .addr_mode = ADDR_INDEX_IND
+};
+Opcode op_24 = {
+  .name = "BIT", .op = &do_24, .write = false, .addr_mode = ADDR_ZPG
+};
+Opcode op_25 = {
+  .name = "AND", .op = &do_25, .write = false, .addr_mode = ADDR_ZPG
+};
+Opcode op_26 = {
+  .name = "ROL", .op = &do_26, .write = true, .addr_mode = ADDR_ZPG
+};
+Opcode op_28 = {
+  .name = "PLP", .op = &do_28, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_29 = {
+  .name = "AND", .op = &do_29, .write = false, .addr_mode = ADDR_IMMEDIATE
+};
+Opcode op_2A = {
+  .name = "ROL", .op = &do_2A, .write = true, .addr_mode = ADDR_ACCUMULATOR
+};
+Opcode op_2C = {
+  .name = "BIT", .op = &do_2C, .write = false, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_2D = {
+  .name = "AND", .op = &do_2D, .write = false, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_2E = {
+  .name = "ROL", .op = &do_2E, .write = true, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_30 = {
+  .name = "BMI", .op = &do_30, .write = false, .addr_mode = ADDR_RELATIVE
+};
+Opcode op_31 = {
+  .name = "AND", .op = &do_31, .write = false, .addr_mode = ADDR_IND_INDEX
+};
+Opcode op_35 = {
+  .name = "AND", .op = &do_35, .write = false, .addr_mode = ADDR_ZPG_X
+};
+Opcode op_36 = {
+  .name = "ROL", .op = &do_36, .write = true, .addr_mode = ADDR_ZPG_X
+};
+Opcode op_38 = {
+  .name = "SEC", .op = &do_38, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_39 = {
+  .name = "AND", .op = &do_39, .write = false, .addr_mode = ADDR_ABSOLUTE_Y
+};
+Opcode op_3D = {
+  .name = "AND", .op = &do_3D, .write = false, .addr_mode = ADDR_ABSOLUTE_X
+};
+Opcode op_3E = {
+  .name = "ROL", .op = &do_3E, .write = true, .addr_mode = ADDR_ABSOLUTE_X
+};
+Opcode op_40 = {
+  .name = "RTI", .op = &do_40, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_41 = {
+  .name = "EOR", .op = &do_41, .write = false, .addr_mode = ADDR_INDEX_IND
+};
+Opcode op_45 = {
+  .name = "EOR", .op = &do_45, .write = false, .addr_mode = ADDR_ZPG
+};
+Opcode op_46 = {
+  .name = "LSR", .op = &do_46, .write = true, .addr_mode = ADDR_ZPG
+};
+Opcode op_48 = {
+  .name = "PHA", .op = &do_48, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_49 = {
+  .name = "EOR", .op = &do_49, .write = false, .addr_mode = ADDR_IMMEDIATE
+};
+Opcode op_4A = {
+  .name = "LSR", .op = &do_4A, .write = true, .addr_mode = ADDR_ACCUMULATOR
+};
+Opcode op_4C = {
+  .name = "JMP", .op = &do_4C, .write = false, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_4D = {
+  .name = "EOR", .op = &do_4D, .write = false, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_4E = {
+  .name = "LSR", .op = &do_4E, .write = true, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_50 = {
+  .name = "BVC", .op = &do_50, .write = false, .addr_mode = ADDR_RELATIVE
+};
+Opcode op_51 = {
+  .name = "EOR", .op = &do_51, .write = false, .addr_mode = ADDR_IND_INDEX
+};
+Opcode op_55 = {
+  .name = "EOR", .op = &do_55, .write = false, .addr_mode = ADDR_ZPG_X
+};
+Opcode op_56 = {
+  .name = "LSR", .op = &do_56, .write = true, .addr_mode = ADDR_ZPG_X
+};
+Opcode op_58 = {
+  .name = "CLI", .op = &do_58, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_59 = {
+  .name = "EOR", .op = &do_59, .write = false, .addr_mode = ADDR_ABSOLUTE_Y
+};
+Opcode op_5D = {
+  .name = "EOR", .op = &do_5D, .write = false, .addr_mode = ADDR_ABSOLUTE_X
+};
+Opcode op_5E = {
+  .name = "LSR", .op = &do_5E, .write = true, .addr_mode = ADDR_ABSOLUTE_X
+};
+Opcode op_60 = {
+  .name = "RTS", .op = &do_60, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_61 = {
+  .name = "ADC", .op = &do_61, .write = false, .addr_mode = ADDR_INDEX_IND
+};
+Opcode op_65 = {
+  .name = "ADC", .op = &do_65, .write = false, .addr_mode = ADDR_ZPG
+};
+Opcode op_66 = {
+  .name = "ROR", .op = &do_66, .write = true, .addr_mode = ADDR_ZPG
+};
+Opcode op_68 = {
+  .name = "PLA", .op = &do_68, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_69 = {
+  .name = "ADC", .op = &do_69, .write = false, .addr_mode = ADDR_IMMEDIATE
+};
+Opcode op_6A = {
+  .name = "ROR", .op = &do_6A, .write = true, .addr_mode = ADDR_ACCUMULATOR
+};
+Opcode op_6C = {
+  .name = "JMP", .op = &do_6C, .write = false, .addr_mode = ADDR_INDIRECT
+};
+Opcode op_6D = {
+  .name = "ADC", .op = &do_6D, .write = false, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_6E = {
+  .name = "ROR", .op = &do_6E, .write = true, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_70 = {
+  .name = "BVS", .op = &do_70, .write = false, .addr_mode = ADDR_RELATIVE
+};
+Opcode op_71 = {
+  .name = "ADC", .op = &do_71, .write = false, .addr_mode = ADDR_IND_INDEX
+};
+Opcode op_75 = {
+  .name = "ADC", .op = &do_75, .write = false, .addr_mode = ADDR_ZPG_X
+};
+Opcode op_76 = {
+  .name = "ROR", .op = &do_76, .write = true, .addr_mode = ADDR_ZPG_X
+};
+Opcode op_78 = {
+  .name = "SEI", .op = &do_78, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_79 = {
+  .name = "ADC", .op = &do_79, .write = false, .addr_mode = ADDR_ABSOLUTE_Y
+};
+Opcode op_7D = {
+  .name = "ADC", .op = &do_7D, .write = false, .addr_mode = ADDR_ABSOLUTE_X
+};
+Opcode op_7E = {
+  .name = "ROR", .op = &do_7E, .write = true, .addr_mode = ADDR_ABSOLUTE_X
+};
+Opcode op_81 = {
+  .name = "STA", .op = &do_81, .write = true, .addr_mode = ADDR_INDEX_IND
+};
+Opcode op_84 = {
+  .name = "STY", .op = &do_84, .write = false, .addr_mode = ADDR_ZPG
+};
+Opcode op_85 = {
+  .name = "STA", .op = &do_85, .write = true, .addr_mode = ADDR_ZPG
+};
+Opcode op_86 = {
+  .name = "STX", .op = &do_86, .write = false, .addr_mode = ADDR_ZPG
+};
+Opcode op_88 = {
+  .name = "DEY", .op = &do_88, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_8A = {
+  .name = "TXA", .op = &do_8A, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_8C = {
+  .name = "STY", .op = &do_8C, .write = false, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_8D = {
+  .name = "STA", .op = &do_8D, .write = true, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_8E = {
+  .name = "STX", .op = &do_8E, .write = false, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_90 = {
+  .name = "BCC", .op = &do_90, .write = false, .addr_mode = ADDR_RELATIVE
+};
+Opcode op_91 = {
+  .name = "STA", .op = &do_91, .write = true, .addr_mode = ADDR_IND_INDEX
+};
+Opcode op_94 = {
+  .name = "STY", .op = &do_94, .write = false, .addr_mode = ADDR_ZPG_X
+};
+Opcode op_95 = {
+  .name = "STA", .op = &do_95, .write = true, .addr_mode = ADDR_ZPG_X
+};
+Opcode op_96 = {
+  .name = "STX", .op = &do_96, .write = false, .addr_mode = ADDR_ZPG_Y
+};
+Opcode op_98 = {
+  .name = "TYA", .op = &do_98, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_99 = {
+  .name = "STA", .op = &do_99, .write = true, .addr_mode = ADDR_ABSOLUTE_Y
+};
+Opcode op_9A = {
+  .name = "TXS", .op = &do_9A, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_9D = {
+  .name = "STA", .op = &do_9D, .write = true, .addr_mode = ADDR_ABSOLUTE_X
+};
+Opcode op_A0 = {
+  .name = "LDY", .op = &do_A0, .write = false, .addr_mode = ADDR_IMMEDIATE
+};
+Opcode op_A1 = {
+  .name = "LDA", .op = &do_A1, .write = false, .addr_mode = ADDR_INDEX_IND
+};
+Opcode op_A2 = {
+  .name = "LDX", .op = &do_A2, .write = false, .addr_mode = ADDR_IMMEDIATE
+};
+Opcode op_A4 = {
+  .name = "LDY", .op = &do_A4, .write = false, .addr_mode = ADDR_ZPG
+};
+Opcode op_A5 = {
+  .name = "LDA", .op = &do_A5, .write = false, .addr_mode = ADDR_ZPG
+};
+Opcode op_A6 = {
+  .name = "LDX", .op = &do_A6, .write = false, .addr_mode = ADDR_ZPG
+};
+Opcode op_A8 = {
+  .name = "TAY", .op = &do_A8, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_A9 = {
+  .name = "LDA", .op = &do_A9, .write = false, .addr_mode = ADDR_IMMEDIATE
+};
+Opcode op_AA = {
+  .name = "TAX", .op = &do_AA, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_AC = {
+  .name = "LDY", .op = &do_AC, .write = false, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_AD = {
+  .name = "LDA", .op = &do_AD, .write = false, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_AE = {
+  .name = "LDX", .op = &do_AE, .write = false, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_B0 = {
+  .name = "BCS", .op = &do_B0, .write = false, .addr_mode = ADDR_RELATIVE
+};
+Opcode op_B1 = {
+  .name = "LDA", .op = &do_B1, .write = false, .addr_mode = ADDR_IND_INDEX
+};
+Opcode op_B4 = {
+  .name = "LDY", .op = &do_B4, .write = false, .addr_mode = ADDR_ZPG_X
+};
+Opcode op_B5 = {
+  .name = "LDA", .op = &do_B5, .write = false, .addr_mode = ADDR_ZPG_X
+};
+Opcode op_B6 = {
+  .name = "LDX", .op = &do_B6, .write = false, .addr_mode = ADDR_ZPG_Y
+};
+Opcode op_B8 = {
+  .name = "CLV", .op = &do_B8, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_B9 = {
+  .name = "LDA", .op = &do_B9, .write = false, .addr_mode = ADDR_ABSOLUTE_Y
+};
+Opcode op_BA = {
+  .name = "TSX", .op = &do_BA, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_BC = {
+  .name = "LDY", .op = &do_BC, .write = false, .addr_mode = ADDR_ABSOLUTE_X
+};
+Opcode op_BD = {
+  .name = "LDA", .op = &do_BD, .write = false, .addr_mode = ADDR_ABSOLUTE_X
+};
+Opcode op_BE = {
+  .name = "LDX", .op = &do_BE, .write = false, .addr_mode = ADDR_ABSOLUTE_Y
+};
+Opcode op_C0 = {
+  .name = "CPY", .op = &do_C0, .write = false, .addr_mode = ADDR_IMMEDIATE
+};
+Opcode op_C1 = {
+  .name = "CMP", .op = &do_C1, .write = false, .addr_mode = ADDR_INDEX_IND
+};
+Opcode op_C4 = {
+  .name = "CPY", .op = &do_C4, .write = false, .addr_mode = ADDR_ZPG
+};
+Opcode op_C5 = {
+  .name = "CMP", .op = &do_C5, .write = false, .addr_mode = ADDR_ZPG
+};
+Opcode op_C6 = {
+  .name = "DEC", .op = &do_C6, .write = true, .addr_mode = ADDR_ZPG
+};
+Opcode op_C8 = {
+  .name = "INY", .op = &do_C8, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_C9 = {
+  .name = "CMP", .op = &do_C9, .write = false, .addr_mode = ADDR_IMMEDIATE
+};
+Opcode op_CA = {
+  .name = "DEX", .op = &do_CA, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_CC = {
+  .name = "CPY", .op = &do_CC, .write = false, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_CD = {
+  .name = "CMP", .op = &do_CD, .write = false, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_CE = {
+  .name = "DEC", .op = &do_CE, .write = true, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_D0 = {
+  .name = "BNE", .op = &do_D0, .write = false, .addr_mode = ADDR_RELATIVE
+};
+Opcode op_D1 = {
+  .name = "CMP", .op = &do_D1, .write = false, .addr_mode = ADDR_IND_INDEX
+};
+Opcode op_D5 = {
+  .name = "CMP", .op = &do_D5, .write = false, .addr_mode = ADDR_ZPG_X
+};
+Opcode op_D6 = {
+  .name = "DEC", .op = &do_D6, .write = true, .addr_mode = ADDR_ZPG_X
+};
+Opcode op_D8 = {
+  .name = "CLD", .op = &do_D8, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_D9 = {
+  .name = "CMP", .op = &do_D9, .write = false, .addr_mode = ADDR_ABSOLUTE_Y
+};
+Opcode op_DD = {
+  .name = "CMP", .op = &do_DD, .write = false, .addr_mode = ADDR_ABSOLUTE_X
+};
+Opcode op_DE = {
+  .name = "DEC", .op = &do_DE, .write = true, .addr_mode = ADDR_ABSOLUTE_X
+};
+Opcode op_E0 = {
+  .name = "CPX", .op = &do_E0, .write = false, .addr_mode = ADDR_IMMEDIATE
+};
+Opcode op_E1 = {
+  .name = "SBC", .op = &do_E1, .write = false, .addr_mode = ADDR_INDEX_IND
+};
+Opcode op_E4 = {
+  .name = "CPX", .op = &do_E4, .write = false, .addr_mode = ADDR_ZPG
+};
+Opcode op_E5 = {
+  .name = "SBC", .op = &do_E5, .write = false, .addr_mode = ADDR_ZPG
+};
+Opcode op_E6 = {
+  .name = "INC", .op = &do_E6, .write = true, .addr_mode = ADDR_ZPG
+};
+Opcode op_E8 = {
+  .name = "INX", .op = &do_E8, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_E9 = {
+  .name = "SBC", .op = &do_E9, .write = false, .addr_mode = ADDR_IMMEDIATE
+};
+Opcode op_EA = {
+  .name = "NOP", .op = &do_EA, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_EC = {
+  .name = "CPX", .op = &do_EC, .write = false, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_ED = {
+  .name = "SBC", .op = &do_ED, .write = false, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_EE = {
+  .name = "INC", .op = &do_EE, .write = true, .addr_mode = ADDR_ABSOLUTE
+};
+Opcode op_F0 = {
+  .name = "BEQ", .op = &do_F0, .write = false, .addr_mode = ADDR_RELATIVE
+};
+Opcode op_F1 = {
+  .name = "SBC", .op = &do_F1, .write = false, .addr_mode = ADDR_IND_INDEX
+};
+Opcode op_F5 = {
+  .name = "SBC", .op = &do_F5, .write = false, .addr_mode = ADDR_ZPG_X
+};
+Opcode op_F6 = {
+  .name = "INC", .op = &do_F6, .write = true, .addr_mode = ADDR_ZPG_X
+};
+Opcode op_F8 = {
+  .name = "SED", .op = &do_F8, .write = false, .addr_mode = ADDR_IMPLICIT
+};
+Opcode op_F9 = {
+  .name = "SBC", .op = &do_F9, .write = false, .addr_mode = ADDR_ABSOLUTE_Y
+};
+Opcode op_FD = {
+  .name = "SBC", .op = &do_FD, .write = false, .addr_mode = ADDR_ABSOLUTE_X
+};
+Opcode op_FE = {
+  .name = "INC", .op = &do_FE, .write = true, .addr_mode = ADDR_ABSOLUTE_X
+};
 
-opcode_func opcode[0x100] = {
+Opcode* opcodes[0x100] = {
   &op_00,&op_01,&op_XX,&op_XX,&op_XX,&op_05,&op_06,&op_XX,&op_08,&op_09,&op_0A,&op_XX,&op_XX,&op_0D,&op_0E,&op_XX,
   &op_10,&op_11,&op_XX,&op_XX,&op_XX,&op_15,&op_16,&op_XX,&op_18,&op_19,&op_XX,&op_XX,&op_XX,&op_1D,&op_1E,&op_XX,
   &op_20,&op_21,&op_XX,&op_XX,&op_24,&op_25,&op_26,&op_XX,&op_28,&op_29,&op_2A,&op_XX,&op_2C,&op_2D,&op_2E,&op_XX,
@@ -2176,5 +2620,5 @@ opcode_func opcode[0x100] = {
 };
 
 void run_opcode(M6502* cpu)  {
-  opcode[cpu->IR >> 3](cpu);
+  (*opcodes[cpu->IR >> 3]->op)(cpu);
 }
