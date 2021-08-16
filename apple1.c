@@ -322,6 +322,10 @@ int main_loop() {
     fprintf(stderr, "Error joining input thread\n");
     return ERROR_PTHREAD_JOIN;
   }
+  char input[64];
+  char prev_input[64];
+  memset(input, 0x00, sizeof(input));
+  memset(prev_input, 0x00, sizeof(prev_input));
   while(debug_mode) {
     // The main control loop ended becase a break into debugger happened,
     // we'll handle this until we resume, at which point the main control
@@ -334,8 +338,6 @@ int main_loop() {
     // We set poweroff to false again so that the CPU can work whenever
     // we clock it manually
     poweroff = false;
-    char input[64];
-    char prev_input[64];
     printf("dbg> ");
     char* line_read = fgets(input, 64, stdin);
     if(line_read) {
