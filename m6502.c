@@ -27,6 +27,8 @@
 #include <fcntl.h>
 #include <errno.h>
 
+extern Opcode* opcodes[0x10000];
+
 void get_arg_indirect_index(M6502* cpu) {
     switch(cpu->IR & IR_STATUS_MASK) {
     case 0:

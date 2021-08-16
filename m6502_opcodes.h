@@ -50,8 +50,6 @@ typedef struct {
   int addr_mode;
 } Opcode;
 
-Opcode* opcodes[0x100];
-
 void run_opcode(M6502* cpu);
 void print_disassembly(M6502* cpu, uint16_t addr, unsigned int num_instructions);
 
