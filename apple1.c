@@ -25,6 +25,7 @@
 #include "apple1.h"
 #include "pia6821.h"
 #include "m6502_opcodes.h"
+#include "debug.h"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -32,14 +33,13 @@
 #include <signal.h>
 #include <string.h>
 
-bool debug_mode = false;
-
 float emulation_speed = 0.0;
 
 volatile uint16_t address_bus;
 volatile uint8_t data_bus;
 volatile bool reset_line;
 volatile bool poweroff = false;
+volatile bool debug_mode = false;
 
 M6502 cpu;
 Connected_chip cpu_callback = {
@@ -275,10 +275,11 @@ void print_debugger_help() {
   printf("n or next: Step clock until the next instruction fetch\n");
   printf("s or step: Step clock one full cycle\n");
   printf("c or continue: Exit debugger and resume execution\n");
-  printf("l or list <ADDR>: Disassemble instructions around this address\n");
+  printf("l or list <ADDR>: Disassemble a bunch of instructions from this address\n");
   printf("b or breakpoint <ADDR>: Break when we try to execute this address\n");
   printf("bw or breakpointw <ADDR>: Break when we try to write this address\n");
   printf("br or breakpointr <ADDR>: Break when we try to read this address\n");
+  printf("p or print PC/A/X/Y/S/<ADDR>: Print the value of the specified register or memory\n");
   printf("set PC/A/X/Y/S/<ADDR> <VALUE>: Change value of the specified register or memory\n");
   printf("h or help: This thing\n");
   printf("q or quit: Exit the emulator\n");
@@ -338,36 +339,69 @@ int main_loop() {
     printf("dbg> ");
     char* line_read = fgets(input, 64, stdin);
     if(line_read) {
-      if(!strncmp(line_read,"\n", 1)) {
+      line_read[strcspn(line_read, "\n")] = '\0';
+      if(*line_read == '\0') {
         // if empty line, replay last command
         memcpy(input, prev_input, sizeof(input));  
       } else {
         memcpy(prev_input, input, sizeof(input));
       }
-      if(!strncmp(line_read, "next\n", 5) || !strncmp(line_read, "n\n", 2)) {
+      if(!strncmp(line_read, "next", 4) || !strncmp(line_read, "n", 1)) {
         process_emulator_input(EMULATOR_STEP_INSTRUCTION);
-      } else if(!strncmp(line_read, "step\n", 5) || !strncmp(line_read, "s\n", 2)) {
+      } else if(!strncmp(line_read, "set ", 4)) {
+        char* arg1 = read_arg(input);
+        char* arg2 = read_arg(arg1);
+        if(arg1 != NULL && arg2 != NULL) {
+          uint16_t value;
+          int ret = parse_hex(arg2, &value);
+          if(ret != SUCCESS) {
+            printf("Invalid value specified\n");
+          } else {
+            ret = set_value(&cpu, arg1, value);
+            if(ret != SUCCESS) {
+              printf("Invalid address or register specified\n");
+            }
+          }
+        } else {
+          printf("Missing argument\n");
+        }
+      } else if(!strncmp(line_read, "step", 4) || !strncmp(line_read, "s", 1)) {
         process_emulator_input(EMULATOR_STEP_CLOCK);
-      } else if(!strncmp(line_read, "continue\n", 9) || !strncmp(line_read, "c\n", 2)) {
+      } else if(!strncmp(line_read, "continue", 8) || !strncmp(line_read, "c", 1)) {
         process_emulator_input(EMULATOR_CONTINUE);
-      } else if(!strncmp(line_read, "help\n", 5) || !strncmp(line_read, "h\n", 2)) {
+      } else if(!strncmp(line_read, "help", 4) || !strncmp(line_read, "h", 1)) {
         print_debugger_help();
       } else if(!strncmp(line_read, "breakpoint ", 11) || !strncmp(line_read, "b ", 2)) {
         // b/breakpoint ADDR
         printf("TODO: breakpoint\n");
-      } else if(!strncmp(line_read, "breakpointw ", 11) || !strncmp(line_read, "bw ", 2)) {
+      } else if(!strncmp(line_read, "breakpointw ", 12) || !strncmp(line_read, "bw ", 3)) {
         // bw/breakpointw ADDR
         printf("TODO: breakpointw\n");
-      } else if(!strncmp(line_read, "breakpointr ", 11) || !strncmp(line_read, "br ", 2)) {
-        // be/breakpointr ADDR
+      } else if(!strncmp(line_read, "breakpointr ", 12) || !strncmp(line_read, "br ", 3)) {
+        // br/breakpointr ADDR
         printf("TODO: breakpointr\n");
-      } else if(!strncmp(line_read, "list ", 5) || !strncmp(line_read, "l ", 2)) {
-        // l/list ADDR
-        printf("TODO: list\n");
-      } else if(!strncmp(line_read, "set ", 4)) {
-        // set PC/A/X/Y/S/ADDR value
-        printf("TODO: set\n");
-      } else if(!strncmp(line_read, "quit\n", 5) || !strncmp(line_read, "q\n", 2)) {
+      } else if(!strncmp(line_read, "list ", 5) || !strncmp(line_read, "l ", 3)) {
+        char* arg1 = read_arg(input);
+        if(arg1 != NULL) {
+          uint16_t addr;
+          int ret = parse_hex(arg1, &addr);
+          if(ret != SUCCESS) {
+            printf("Invalid address specified\n");
+          } else {
+            print_disassembly(&cpu, addr, 10);
+          }
+        }
+      } else if(!strncmp(line_read, "print ", 6)  || !strncmp(line_read, "p ", 2)) {
+        char* arg1 = read_arg(input);
+        if(arg1 != NULL) {
+          int ret = print_value(&cpu, arg1);
+          if(ret != SUCCESS) {
+            printf("Invalid address or register specified\n");
+          }
+        } else {
+          printf("Missing argument\n");
+        }
+      } else if(!strncmp(line_read, "quit", 4) || !strncmp(line_read, "q", 1)) {
         // When we exit the debug_mode loop, it'll either be with poweroff = false, because
         // a continue was called, or poweroff = true because of this break here, which will
         // cause the emulator to shut down, which is what we want
@@ -376,6 +410,10 @@ int main_loop() {
       } else {
         printf("Unrecognised command: %s\n", input);
       }
+    } else if(feof(stdin)) {
+      printf("\n");
+      poweroff = true;
+      debug_mode = false;
     }
   }
 
