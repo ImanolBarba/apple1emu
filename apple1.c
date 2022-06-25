@@ -244,10 +244,20 @@ void process_emulator_input(char key) {
       fprintf(stderr, "cycles per second: %.2f\n", emulation_speed);
     break;
     case EMULATOR_SAVE_STATE:
+      main_clock.enabled = false;
+      while(main_clock.active) {
+        // spin
+      }
       save_state(&cpu);
+      main_clock.enabled = true;
     break;
     case EMULATOR_LOAD_STATE:
+      main_clock.enabled = false;
+      while(main_clock.active) {
+        // spin
+      }
       load_state(&cpu);
+      main_clock.enabled = true;
     break;
     case EMULATOR_TURBO:
       main_clock.turbo = !main_clock.turbo;

@@ -41,6 +41,8 @@ typedef struct {
   volatile bool* stop;
   long int clock_adjust;
   volatile bool turbo;
+  volatile bool enabled;
+  volatile bool active;
 } Clock;
 
 void init_clock(Clock* c, unsigned int freq);

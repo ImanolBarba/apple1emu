@@ -28,6 +28,8 @@
 #include <sys/time.h>
 
 void init_clock(Clock* c, unsigned int freq) {
+  c->enabled = true;
+  c->active = false;
   c->freq = freq;
   c->num_chips = 0;
   memset(c->clock_bus, 0, MAX_CHIPS_ON_BUS * sizeof(Connected_chip*));
@@ -50,17 +52,21 @@ void *clock_run(void* ptr) {
   struct timespec delta={0,0};
   clock_gettime(CLOCK_MONOTONIC, &begin);
   while(!(*c->stop)) {
-    tick(c);
-    tock(c);
-    if(c->turbo) {
-      continue;
-    }
-    if((++tick_count == TICKS_FOR_SYNC)) {
-      clock_gettime(CLOCK_MONOTONIC, &end);
-      delta.tv_nsec = (1e9/c->freq)*TICKS_FOR_SYNC - (end.tv_nsec - begin.tv_nsec) - c->clock_adjust;
-      nanosleep(&delta, NULL);
-      clock_gettime(CLOCK_MONOTONIC, &begin);
-      tick_count = 0;
+    if(c->enabled) {
+      c->active = true;
+      tick(c);
+      tock(c);
+      c->active = false;
+      if(c->turbo) {
+        continue;
+      }
+      if((++tick_count == TICKS_FOR_SYNC)) {
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        delta.tv_nsec = (1e9/c->freq)*TICKS_FOR_SYNC - (end.tv_nsec - begin.tv_nsec) - c->clock_adjust;
+        nanosleep(&delta, NULL);
+        clock_gettime(CLOCK_MONOTONIC, &begin);
+        tick_count = 0;
+      }
     }
   }
   fprintf(stderr, "Stopping clock thread...\n");
