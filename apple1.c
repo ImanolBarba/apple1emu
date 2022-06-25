@@ -348,7 +348,7 @@ int main_loop() {
     // We set poweroff to false again so that the CPU can work whenever
     // we clock it manually
     poweroff = false;
-    printf("dbg> ");
+    printf("0x%04X dbg> ", address_bus);
     char* line_read = fgets(input, 64, stdin);
     if(line_read) {
       line_read[strcspn(line_read, "\n")] = '\0';
@@ -392,7 +392,7 @@ int main_loop() {
       } else if(!strncmp(line_read, "breakpointr ", 12) || !strncmp(line_read, "br ", 3)) {
         // br/breakpointr ADDR
         printf("TODO: breakpointr\n");
-      } else if(!strncmp(line_read, "list ", 5) || !strncmp(line_read, "l ", 3)) {
+      } else if(!strncmp(line_read, "list ", 5) || !strncmp(line_read, "l ", 2)) {
         char* arg1 = read_arg(input);
         if(arg1 != NULL) {
           uint16_t addr;
