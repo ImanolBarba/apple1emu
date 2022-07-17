@@ -341,10 +341,6 @@ int main_loop() {
     // we'll handle this until we resume, at which point the main control
     // loop will be restarted by the parent function
 
-    // TODO: Need to find a way to provide input to the Apple I through
-    // the debugger without writing to memory, some input buffer of some
-    // kind
-
     // We set poweroff to false again so that the CPU can work whenever
     // we clock it manually
     poweroff = false;
